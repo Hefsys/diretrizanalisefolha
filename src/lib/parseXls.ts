@@ -5,31 +5,46 @@ export interface PlanilhaFuncionario {
   setor: string;
   matricula: string;
   nome: string;
-  comissao: number;
-  gratificacao: number;
-  premio: number;
-  adiantPremio: number;
+  comissao: number;        // verba 37
+  gratificacao: number;    // verba 20
+  gratificacaoNps: number; // verba 286 (apenas em alguns setores)
+  premio: number;          // verba 219
+  adiantPremio: number;    // verba 241
 }
 
 export interface PlanilhaParseResult {
   setor: string;
+  arquivo: string;          // nome do arquivo de origem
   empresa?: string;
-  cnpj?: string;
-  competencia?: string;
+  cnpj?: string;            // CNPJ desta planilha (pode diferir entre filiais)
+  unidade?: string;         // ex: "FILIAL NATAL/RN"
+  competencia?: string;     // MM/AAAA
   funcionarios: PlanilhaFuncionario[];
 }
 
-// Mapeia rótulo de coluna → campo
-const COL_MAP: Array<{ rx: RegExp; key: keyof Omit<PlanilhaFuncionario, "setor" | "matricula" | "nome"> }> = [
+type FieldKey = "comissao" | "gratificacao" | "gratificacaoNps" | "premio" | "adiantPremio";
+
+// Mapeia rótulo de coluna → campo. ORDEM IMPORTA: NPS antes de "GRATIFICA" comum.
+const COL_MAP: Array<{ rx: RegExp; key: FieldKey }> = [
   { rx: /COMISS/i, key: "comissao" },
-  { rx: /^GRATIFICA[CÇ][AÃ]O\s*NPS/i, key: "gratificacao" }, // NPS soma em gratificação
+  { rx: /GRATIFICA[CÇ][AÃ]O\s*NPS/i, key: "gratificacaoNps" },
   { rx: /^GRATIFICA/i, key: "gratificacao" },
-  { rx: /ADIANTAMENTO\s*PREMIO/i, key: "adiantPremio" },
-  { rx: /^PREMIO/i, key: "premio" },
+  { rx: /ADIANTAMENTO\s*PR[EÊ]MIO/i, key: "adiantPremio" },
+  { rx: /^PR[EÊ]MIO/i, key: "premio" },
 ];
 
-function detectColumns(headerRow: any[]): Record<number, keyof Omit<PlanilhaFuncionario, "setor" | "matricula" | "nome">> {
-  const out: Record<number, keyof Omit<PlanilhaFuncionario, "setor" | "matricula" | "nome">> = {};
+// Códigos de verba na linha logo abaixo do cabeçalho (ex: 37, 20, 286, 219, 241)
+const VERBA_MAP: Record<string, FieldKey> = {
+  "37": "comissao",
+  "20": "gratificacao",
+  "286": "gratificacaoNps",
+  "219": "premio",
+  "241": "adiantPremio",
+};
+
+function detectColumns(headerRow: any[], verbaRow: any[]): Record<number, FieldKey> {
+  const out: Record<number, FieldKey> = {};
+  // 1) Por rótulo
   for (let i = 0; i < headerRow.length; i++) {
     const v = String(headerRow[i] ?? "").trim();
     if (!v) continue;
@@ -40,17 +55,32 @@ function detectColumns(headerRow: any[]): Record<number, keyof Omit<PlanilhaFunc
       }
     }
   }
+  // 2) Reforço pela linha de códigos de verba (mais confiável)
+  for (let i = 0; i < verbaRow.length; i++) {
+    const raw = verbaRow[i];
+    if (raw === "" || raw === null || raw === undefined) continue;
+    const code = String(Math.trunc(Number(raw) || 0));
+    if (VERBA_MAP[code]) out[i] = VERBA_MAP[code];
+  }
   return out;
 }
 
-// Lê uma sheet "RELAÇÃO DE VALORES PARA FOLHA DE PAGAMENTO"
-function parseSheet(wb: XLSX.WorkBook, sheetName: string, fallbackSetor: string): PlanilhaParseResult | null {
+function excelSerialToMMYYYY(serial: number): string | undefined {
+  const d = XLSX.SSF.parse_date_code(serial);
+  if (!d) return undefined;
+  return `${String(d.m).padStart(2, "0")}/${d.y}`;
+}
+
+function parseSheet(
+  wb: XLSX.WorkBook,
+  sheetName: string,
+  arquivo: string,
+): PlanilhaParseResult | null {
   const ws = wb.Sheets[sheetName];
   if (!ws) return null;
   const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
   if (rows.length < 5) return null;
 
-  // Verifica se é uma planilha de folha
   const firstCells = rows.slice(0, 3).map((r) => String(r[0] ?? "")).join(" ").toUpperCase();
   if (!firstCells.includes("RELAÇÃO DE VALORES") && !firstCells.includes("RELACAO DE VALORES")) {
     return null;
@@ -58,6 +88,7 @@ function parseSheet(wb: XLSX.WorkBook, sheetName: string, fallbackSetor: string)
 
   let empresa: string | undefined;
   let cnpj: string | undefined;
+  let unidade: string | undefined;
   let competencia: string | undefined;
   let headerRowIdx = -1;
 
@@ -69,32 +100,33 @@ function parseSheet(wb: XLSX.WorkBook, sheetName: string, fallbackSetor: string)
     }
     if (joined.includes("CNPJ")) {
       const v = row[2] || row[1];
-      if (v) cnpj = String(v).replace(/\D/g, "");
+      if (v) cnpj = String(v).replace(/\D/g, "").slice(0, 14);
+    }
+    if (joined.includes("UNIDADE")) {
+      unidade = row[2] || row[1] || unidade;
     }
     if (joined.includes("COMPETENCIA") || joined.includes("COMPETÊNCIA")) {
       const raw = rows[i][2] ?? rows[i][1];
       if (typeof raw === "number") {
-        // Excel serial date
-        const d = XLSX.SSF.parse_date_code(raw);
-        if (d) competencia = `${String(d.m).padStart(2, "0")}/${d.y}`;
+        competencia = excelSerialToMMYYYY(raw);
       } else if (raw) {
         competencia = String(raw);
       }
     }
-    // Header é a linha que tem "COMISS" ou "GRATIFICA"
-    const upper = joined;
-    if (upper.includes("COMISS") || upper.includes("GRATIFICA")) {
+    // Header tem "COMISS" ou "GRATIFICA"
+    if (joined.includes("COMISS") || joined.includes("GRATIFICA")) {
       headerRowIdx = i;
     }
   }
 
   if (headerRowIdx === -1) return null;
 
-  const colMap = detectColumns(rows[headerRowIdx]);
+  // Linha imediatamente abaixo do cabeçalho costuma trazer os códigos de verba
+  const verbaRow = rows[headerRowIdx + 1] ?? [];
+  const colMap = detectColumns(rows[headerRowIdx], verbaRow);
   if (Object.keys(colMap).length === 0) return null;
 
-  // Coluna do código (matrícula) e nome — em geral col 1 e 2
-  // Mas detecta pelos rótulos da linha do header também
+  // Detecta colunas de código (matrícula) e nome
   let colCodigo = 1;
   let colNome = 2;
   const headerStr = rows[headerRowIdx].map((c) => String(c ?? "").toUpperCase());
@@ -103,18 +135,35 @@ function parseSheet(wb: XLSX.WorkBook, sheetName: string, fallbackSetor: string)
     if (/NOME|COLABORADOR/.test(h) && idx <= 3) colNome = idx;
   });
 
+  // Setor "real" = nome da sheet (ex: "VEIC NOVOS_", "ASSIST TEC_CDN", "ADM")
+  const setor = sheetName.replace(/_+$/, "").trim();
+
   const funcionarios: PlanilhaFuncionario[] = [];
+  // Dados começam 2 linhas após o header (header + linha de códigos de verba)
   for (let i = headerRowIdx + 2; i < rows.length; i++) {
     const r = rows[i];
-    const codigo = r[colCodigo];
-    const nome = r[colNome];
-    if (!nome || String(nome).trim() === "") continue;
+    const codigoRaw = r[colCodigo];
+    const nomeRaw = r[colNome];
+    const tipoCalc = String(r[0] ?? "").trim().toUpperCase();
+
+    // Ignora linhas de TOTAL / SUBTOTAL
+    if (tipoCalc === "TOTAL" || tipoCalc === "SUBTOTAL") continue;
+    if (!nomeRaw || String(nomeRaw).trim() === "") continue;
+    const nomeStr = String(nomeRaw).trim();
+    if (/^COLABORADOR(ES)?$/i.test(nomeStr)) continue;
+
+    const matricula =
+      codigoRaw !== "" && codigoRaw !== null && codigoRaw !== undefined
+        ? String(Math.trunc(Number(codigoRaw) || 0) || codigoRaw).trim()
+        : "";
+
     const f: PlanilhaFuncionario = {
-      setor: fallbackSetor,
-      matricula: codigo !== "" && codigo !== null && codigo !== undefined ? String(Math.trunc(Number(codigo) || 0) || codigo).trim() : "",
-      nome: normalizeName(String(nome)),
+      setor,
+      matricula,
+      nome: normalizeName(nomeStr),
       comissao: 0,
       gratificacao: 0,
+      gratificacaoNps: 0,
       premio: 0,
       adiantPremio: 0,
     };
@@ -122,34 +171,22 @@ function parseSheet(wb: XLSX.WorkBook, sheetName: string, fallbackSetor: string)
       const colIdx = Number(colIdxStr);
       const v = r[colIdx];
       const n = parseBR(v as any);
-      // Soma (porque NPS e GRATIFICAÇÃO ambos caem em gratificacao)
       f[key] = (f[key] as number) + n;
     }
     if (!f.nome) continue;
     funcionarios.push(f);
   }
-  return { setor: fallbackSetor, empresa, cnpj, competencia, funcionarios };
+  return { setor, arquivo, empresa, cnpj, unidade, competencia, funcionarios };
 }
 
 export async function parseFolhaXls(file: File): Promise<PlanilhaParseResult[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array", cellDates: false });
-  const setorBase = file.name
-    .replace(/\.xlsx?$/i, "")
-    .replace(/^PLANILHA[_\s]+DE[_\s]+FOLHA[_\s]*-?\s*/i, "")
-    .replace(/^REF\.[^-]+-\s*PLANILHA[_\s]+DE[_\s]+FOLHA[_\s]*-?\s*/i, "")
-    .replace(/_/g, " ")
-    .trim();
 
   const results: PlanilhaParseResult[] = [];
   for (const sn of wb.SheetNames) {
-    const r = parseSheet(wb, sn, `${setorBase} / ${sn}`.trim());
+    const r = parseSheet(wb, sn, file.name);
     if (r && r.funcionarios.length > 0) results.push(r);
-  }
-  if (results.length === 0) {
-    // Tenta primeira sheet sem detecção de cabeçalho
-    const r = parseSheet(wb, wb.SheetNames[0], setorBase);
-    if (r) results.push(r);
   }
   return results;
 }
