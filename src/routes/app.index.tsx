@@ -250,6 +250,16 @@ function NovaConferencia() {
 
       {result && (
         <Card className="p-6 space-y-5">
+          {result.avisos.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                <Info className="h-4 w-4" /> Avisos da conferência
+              </div>
+              <ul className="text-xs text-amber-900 dark:text-amber-100 list-disc list-inside space-y-0.5">
+                {result.avisos.map((a, i) => <li key={i}>{a.detalhe}</li>)}
+              </ul>
+            </div>
+          )}
           <div className="grid md:grid-cols-4 gap-4">
             <Stat label="Funcionários" value={String(result.totais.funcionarios)} />
             <Stat label="Divergências" value={String(result.totais.divergentes)} variant={result.totais.divergentes > 0 ? "warn" : "ok"} />
