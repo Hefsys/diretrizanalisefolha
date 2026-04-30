@@ -170,7 +170,7 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
         nome: head.nome,
         cpf: head.cpf,
         situacao: head.situacao,
-        comissao: 0, gratificacao: 0, premio: 0, adiantPremio: 0,
+        comissao: 0, gratificacao: 0, gratificacaoNps: 0, premio: 0, adiantPremio: 0,
         baseInss: 0, valorFgts: 0, emprestimos: 0, emprestimosCount: 0,
         proventos: 0, descontos: 0, liquido: 0,
       };
