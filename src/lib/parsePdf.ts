@@ -2,9 +2,8 @@ import { normalizeCpf, normalizeName, parseBR } from "./normalize";
 
 // Worker do pdf.js (carrega do CDN — evita configurar bundling do worker)
 import * as pdfjsLib from "pdfjs-dist";
-// @ts-expect-error - sem types para o worker entry
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc as string;
 
 export interface PdfFuncionario {
   matricula: string;
