@@ -35,7 +35,28 @@ function NovaConferencia() {
   const [filtro, setFiltro] = useState<"todos" | "divergente" | "ok">("todos");
   const [busca, setBusca] = useState("");
 
+  const [filiaisPendentes, setFiliaisPendentes] = useState<PlanilhaParseResult[]>([]);
+  const [filialContext, setFilialContext] = useState<{
+    pdfData: Awaited<ReturnType<typeof parseDominioPdf>>;
+    todasPlan: PlanilhaParseResult[];
+    cnpjPdf: string;
+  } | null>(null);
+
   const pode = pdfFile && planFiles.length > 0;
+
+  const finalizarConferencia = async (
+    pdfData: Awaited<ReturnType<typeof parseDominioPdf>>,
+    planResults: PlanilhaParseResult[],
+  ) => {
+    const esocial = esocialFile ? await parseEsocialXlsx(esocialFile) : [];
+    if (esocialFile) toast.message(`eSocial: ${esocial.length} contratos.`);
+    const r = conferir(pdfData, planResults, esocial);
+    if (!empresa && r.empresa) setEmpresa(r.empresa);
+    if (!cnpj && r.cnpj) setCnpj(r.cnpj);
+    if (!competencia && r.competencia) setCompetencia(r.competencia);
+    setResult(r);
+    toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
+  };
 
   const handleConferir = async () => {
     if (!pdfFile || planFiles.length === 0) {
@@ -49,27 +70,50 @@ function NovaConferencia() {
       const pdfData = await parseDominioPdf(pdfBuf);
       toast.message(`PDF lido: ${pdfData.funcionarios.length} funcionários.`);
 
-      const planResults = [];
+      const planResults: PlanilhaParseResult[] = [];
       for (const f of planFiles) {
-        const r = await parseFolhaXls(f);
+        const r = await parseFolhaXlsLib(f);
         planResults.push(...r);
       }
       toast.message(`Planilhas lidas: ${planResults.reduce((a, p) => a + p.funcionarios.length, 0)} linhas.`);
 
-      const esocial = esocialFile ? await parseEsocialXlsx(esocialFile) : [];
-      if (esocialFile) toast.message(`eSocial: ${esocial.length} contratos de empréstimo.`);
+      // Detecta filiais (CNPJ diferente do PDF)
+      const cnpjPdf = pdfData.cnpj?.replace(/\D/g, "") ?? "";
+      const filiais = cnpjPdf
+        ? planResults.filter((p) => p.cnpj && p.cnpj !== cnpjPdf)
+        : [];
 
-      const r = conferir(pdfData, planResults, esocial);
-      // Preenche metadados se vazios
-      if (!empresa && r.empresa) setEmpresa(r.empresa);
-      if (!cnpj && r.cnpj) setCnpj(r.cnpj);
-      if (!competencia && r.competencia) setCompetencia(r.competencia);
-      setResult(r);
-      toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
+      if (filiais.length > 0) {
+        // Pergunta ao usuário antes de incluir filiais
+        setFilialContext({ pdfData, todasPlan: planResults, cnpjPdf });
+        setFiliaisPendentes(filiais);
+        setBusy(false);
+        return;
+      }
+
+      await finalizarConferencia(pdfData, planResults);
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar arquivos");
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const responderFiliais = async (incluir: boolean) => {
+    if (!filialContext) return;
+    setBusy(true);
+    try {
+      const { pdfData, todasPlan, cnpjPdf } = filialContext;
+      const planFinais = incluir
+        ? todasPlan
+        : todasPlan.filter((p) => !p.cnpj || p.cnpj === cnpjPdf);
+      await finalizarConferencia(pdfData, planFinais);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao processar");
+    } finally {
+      setFiliaisPendentes([]);
+      setFilialContext(null);
       setBusy(false);
     }
   };
