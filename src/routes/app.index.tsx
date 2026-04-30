@@ -14,7 +14,9 @@ import { exportarPdf, exportarExcelDivergencias } from "@/lib/exporters";
 import { fmtBR } from "@/lib/normalize";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { FileText, FileSpreadsheet, Database, Play, Download, FileDown, AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { FileText, FileSpreadsheet, Database, Play, Download, FileDown, AlertTriangle, CheckCircle2, X, Info } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { parseFolhaXls as parseFolhaXlsLib, type PlanilhaParseResult } from "@/lib/parseXls";
 
 export const Route = createFileRoute("/app/")({
   component: NovaConferencia,
