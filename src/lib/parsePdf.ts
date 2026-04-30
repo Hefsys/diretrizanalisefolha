@@ -149,6 +149,7 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
     const block = aggregateLines.join(" \n ");
     current.comissao = tryExtractValueByCode(block, COD_COMISSAO);
     current.gratificacao = tryExtractValueByCode(block, COD_GRATIF);
+    current.gratificacaoNps = tryExtractValueByCode(block, COD_GRATIF_NPS);
     current.premio = tryExtractValueByCode(block, COD_PREMIO);
     current.adiantPremio = tryExtractValueByCode(block, COD_ADIANT_PREMIO);
     // Empréstimos descontados (linhas com "DESC. EMP. CRED. TRAB" + NUM D)
