@@ -296,8 +296,11 @@ function NovaConferencia() {
                   <th className="p-2 text-right">Comissão PDF</th>
                   <th className="p-2 text-right">Comissão Plan.</th>
                   <th className="p-2 text-right">Δ</th>
-                  <th className="p-2 text-right">Gratif. PDF</th>
-                  <th className="p-2 text-right">Gratif. Plan.</th>
+                  <th className="p-2 text-right">Gratif. 20 PDF</th>
+                  <th className="p-2 text-right">Gratif. 20 Plan.</th>
+                  <th className="p-2 text-right">Δ</th>
+                  <th className="p-2 text-right">NPS 286 PDF</th>
+                  <th className="p-2 text-right">NPS 286 Plan.</th>
                   <th className="p-2 text-right">Δ</th>
                   <th className="p-2 text-right">Base INSS</th>
                   <th className="p-2 text-right">FGTS</th>
