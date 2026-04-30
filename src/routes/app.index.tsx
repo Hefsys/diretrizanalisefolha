@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { parseDominioPdf } from "@/lib/parsePdf";
-import { parseFolhaXls, parseEsocialXlsx } from "@/lib/parseXls";
+import { parseEsocialXlsx } from "@/lib/parseXls";
 import { conferir, type ConferenciaResult } from "@/lib/conferir";
 import { exportarPdf, exportarExcelDivergencias } from "@/lib/exporters";
 import { fmtBR } from "@/lib/normalize";
