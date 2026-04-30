@@ -311,6 +311,7 @@ function NovaConferencia() {
                 {itensFiltrados.map((i, idx) => {
                   const dC = i.comissaoPdf - i.comissaoPlan;
                   const dG = i.gratificacaoPdf - i.gratificacaoPlan;
+                  const dN = i.gratificacaoNpsPdf - i.gratificacaoNpsPlan;
                   return (
                     <tr key={idx} className="border-t hover:bg-muted/40">
                       <td className="p-2">
@@ -327,6 +328,9 @@ function NovaConferencia() {
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoPdf)}</td>
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoPlan)}</td>
                       <td className={`p-2 text-right tabular-nums font-semibold ${Math.abs(dG) > 0.05 ? "text-destructive" : "text-muted-foreground"}`}>{fmtBR(dG)}</td>
+                      <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoNpsPdf)}</td>
+                      <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoNpsPlan)}</td>
+                      <td className={`p-2 text-right tabular-nums font-semibold ${Math.abs(dN) > 0.05 ? "text-destructive" : "text-muted-foreground"}`}>{fmtBR(dN)}</td>
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.baseInss)}</td>
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.valorFgts)}</td>
                       <td className="p-2 text-center">{i.emprestimosEsocialQtd > 0 ? <Badge variant="secondary">{i.emprestimosEsocialQtd}</Badge> : "—"}</td>
@@ -334,13 +338,35 @@ function NovaConferencia() {
                   );
                 })}
                 {itensFiltrados.length === 0 && (
-                  <tr><td colSpan={13} className="text-center text-muted-foreground p-6">Nenhum item para o filtro atual.</td></tr>
+                  <tr><td colSpan={16} className="text-center text-muted-foreground p-6">Nenhum item para o filtro atual.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </Card>
       )}
+
+      <AlertDialog open={filiaisPendentes.length > 0} onOpenChange={(o) => !o && responderFiliais(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Planilhas de filial detectadas</AlertDialogTitle>
+            <AlertDialogDescription>
+              As planilhas abaixo têm CNPJ diferente do PDF do Domínio. Deseja incluí-las na conferência mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="text-sm space-y-1 max-h-60 overflow-auto bg-muted/40 rounded p-3">
+            {filiaisPendentes.map((p, i) => (
+              <li key={i} className="font-mono text-xs">
+                <strong>{p.arquivo}</strong> — {p.setor}{p.unidade ? ` (${p.unidade})` : ""} · CNPJ {p.cnpj}
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => responderFiliais(false)}>Ignorar filiais</AlertDialogCancel>
+            <AlertDialogAction onClick={() => responderFiliais(true)}>Incluir todas</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
