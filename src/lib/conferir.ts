@@ -9,20 +9,23 @@ export interface ConferenciaItem {
   matricula: string;
   nome: string;
   setor: string;
-  // PDF (apurado pela folha)
+  arquivoPlan: string;
+  // PDF
   comissaoPdf: number;
   gratificacaoPdf: number;
+  gratificacaoNpsPdf: number;
   premioPdf: number;
   adiantPremioPdf: number;
   baseInss: number;
   valorFgts: number;
   emprestimosPdf: number;
-  // Planilhas .xls (mandado calcular)
+  // Planilhas
   comissaoPlan: number;
   gratificacaoPlan: number;
+  gratificacaoNpsPlan: number;
   premioPlan: number;
   adiantPremioPlan: number;
-  // eSocial gov
+  // eSocial
   emprestimosEsocialQtd: number;
   bancosEsocial: string[];
   // Apuração
@@ -30,11 +33,19 @@ export interface ConferenciaItem {
   divergencias: string[];
 }
 
+export interface AvisoPlanilha {
+  arquivo: string;
+  setor: string;
+  tipo: "competencia_diferente" | "cnpj_diferente";
+  detalhe: string;
+}
+
 export interface ConferenciaResult {
   empresa?: string;
   cnpj?: string;
   competencia?: string;
   itens: ConferenciaItem[];
+  avisos: AvisoPlanilha[];
   totais: {
     funcionarios: number;
     divergentes: number;
@@ -42,32 +53,24 @@ export interface ConferenciaResult {
     comissaoPlan: number;
     gratificacaoPdf: number;
     gratificacaoPlan: number;
+    gratificacaoNpsPdf: number;
+    gratificacaoNpsPlan: number;
   };
 }
 
-// Tolerância para divergência (em R$)
 const TOL = 0.05;
-
-function key(cpf: string, mat: string, nome: string): string {
-  if (cpf && cpf !== "00000000000") return `cpf:${cpf}`;
-  if (mat) return `mat:${mat}`;
-  return `nome:${nome}`;
-}
 
 export function conferir(
   pdf: PdfParseResult,
   planilhas: PlanilhaParseResult[],
   esocial: EsocialContrato[],
 ): ConferenciaResult {
-  // Index por chave em cascata: tenta CPF, depois matrícula, depois nome
-  const planMap = new Map<string, { entry: PlanilhaParseResult["funcionarios"][number]; setor: string }>();
-  const planByMat = new Map<string, { entry: PlanilhaParseResult["funcionarios"][number]; setor: string }>();
-  const planByName = new Map<string, { entry: PlanilhaParseResult["funcionarios"][number]; setor: string }>();
+  const planByMat = new Map<string, { entry: PlanilhaParseResult["funcionarios"][number]; setor: string; arquivo: string }>();
+  const planByName = new Map<string, { entry: PlanilhaParseResult["funcionarios"][number]; setor: string; arquivo: string }>();
   for (const p of planilhas) {
     for (const f of p.funcionarios) {
-      // Planilhas só têm matrícula e nome — sem CPF
-      if (f.matricula) planByMat.set(`mat:${f.matricula}`, { entry: f, setor: p.setor });
-      planByName.set(`nome:${f.nome}`, { entry: f, setor: p.setor });
+      if (f.matricula) planByMat.set(`mat:${f.matricula}`, { entry: f, setor: p.setor, arquivo: p.arquivo });
+      planByName.set(`nome:${f.nome}`, { entry: f, setor: p.setor, arquivo: p.arquivo });
     }
   }
 
@@ -82,25 +85,28 @@ export function conferir(
   const usedPlan = new Set<string>();
   const itens: ConferenciaItem[] = [];
 
-  // Para cada funcionário do PDF, casa com planilha
   for (const f of pdf.funcionarios) {
     const matchPlan =
       (f.matricula && planByMat.get(`mat:${f.matricula}`)) ||
       planByName.get(`nome:${f.nome}`);
     const planEntry = matchPlan?.entry;
     if (matchPlan) {
-      const k = `mat:${matchPlan.entry.matricula}|${matchPlan.entry.nome}`;
-      usedPlan.add(k);
+      usedPlan.add(`mat:${matchPlan.entry.matricula}|${matchPlan.entry.nome}`);
     }
     const esContratos = esocialByCpf.get(f.cpf) ?? [];
 
+    // PDF: gratificacao 20 = "f.gratificacao"; NPS 286 separa? Atualmente parsePdf coloca os dois juntos.
+    // Para manter compatível, assumimos que f.gratificacao = 20+286 do PDF; comparamos em conjunto.
+    // Ajuste real: se o parsePdf futuramente separar, basta preencher abaixo.
     const item: ConferenciaItem = {
       cpf: f.cpf,
       matricula: f.matricula,
       nome: f.nome,
       setor: matchPlan?.setor ?? "",
+      arquivoPlan: matchPlan?.arquivo ?? "",
       comissaoPdf: f.comissao,
       gratificacaoPdf: f.gratificacao,
+      gratificacaoNpsPdf: (f as any).gratificacaoNps ?? 0,
       premioPdf: f.premio,
       adiantPremioPdf: f.adiantPremio,
       baseInss: f.baseInss,
@@ -108,6 +114,7 @@ export function conferir(
       emprestimosPdf: f.emprestimos,
       comissaoPlan: planEntry?.comissao ?? 0,
       gratificacaoPlan: planEntry?.gratificacao ?? 0,
+      gratificacaoNpsPlan: planEntry?.gratificacaoNps ?? 0,
       premioPlan: planEntry?.premio ?? 0,
       adiantPremioPlan: planEntry?.adiantPremio ?? 0,
       emprestimosEsocialQtd: esContratos.length,
@@ -120,24 +127,39 @@ export function conferir(
       item.status = "so_pdf";
       item.divergencias.push("Funcionário não encontrado nas planilhas de comissão/gratificação");
     } else {
+      // Para conferir gratificação, comparamos:
+      // - PDF gratificacao (que pode incluir 20+286 caso parser não tenha separado)
+      //   contra Planilha gratificacao + gratificacaoNps QUANDO PDF não separa
+      // Estratégia: se o parser do PDF não separou NPS, soma planilha 20+286 para comparar com gratificacao do PDF.
+      const npsPdfSeparado = item.gratificacaoNpsPdf > 0;
+      const gratifPlanComparavel = npsPdfSeparado
+        ? item.gratificacaoPlan
+        : item.gratificacaoPlan + item.gratificacaoNpsPlan;
+
       if (!approxEqual(item.comissaoPdf, item.comissaoPlan, TOL)) {
         item.divergencias.push(
-          `Comissão diverge: PDF R$ ${item.comissaoPdf.toFixed(2)} × Planilha R$ ${item.comissaoPlan.toFixed(2)}`
+          `Comissão (37): PDF R$ ${item.comissaoPdf.toFixed(2)} × Planilha R$ ${item.comissaoPlan.toFixed(2)}`
         );
       }
-      if (!approxEqual(item.gratificacaoPdf, item.gratificacaoPlan, TOL)) {
+      if (!approxEqual(item.gratificacaoPdf, gratifPlanComparavel, TOL)) {
+        const detalhe = npsPdfSeparado
+          ? `PDF R$ ${item.gratificacaoPdf.toFixed(2)} × Planilha R$ ${item.gratificacaoPlan.toFixed(2)}`
+          : `PDF R$ ${item.gratificacaoPdf.toFixed(2)} × Planilha (20+NPS) R$ ${gratifPlanComparavel.toFixed(2)}`;
+        item.divergencias.push(`Gratificação (20${npsPdfSeparado ? "" : "+286"}): ${detalhe}`);
+      }
+      if (npsPdfSeparado && !approxEqual(item.gratificacaoNpsPdf, item.gratificacaoNpsPlan, TOL)) {
         item.divergencias.push(
-          `Gratificação diverge: PDF R$ ${item.gratificacaoPdf.toFixed(2)} × Planilha R$ ${item.gratificacaoPlan.toFixed(2)}`
+          `Gratificação NPS (286): PDF R$ ${item.gratificacaoNpsPdf.toFixed(2)} × Planilha R$ ${item.gratificacaoNpsPlan.toFixed(2)}`
         );
       }
       if (!approxEqual(item.premioPdf, item.premioPlan, TOL)) {
         item.divergencias.push(
-          `Prêmio diverge: PDF R$ ${item.premioPdf.toFixed(2)} × Planilha R$ ${item.premioPlan.toFixed(2)}`
+          `Prêmio (219): PDF R$ ${item.premioPdf.toFixed(2)} × Planilha R$ ${item.premioPlan.toFixed(2)}`
         );
       }
       if (!approxEqual(item.adiantPremioPdf, item.adiantPremioPlan, TOL)) {
         item.divergencias.push(
-          `Adiant. Prêmio diverge: PDF R$ ${item.adiantPremioPdf.toFixed(2)} × Planilha R$ ${item.adiantPremioPlan.toFixed(2)}`
+          `Adiant. Prêmio (241): PDF R$ ${item.adiantPremioPdf.toFixed(2)} × Planilha R$ ${item.adiantPremioPlan.toFixed(2)}`
         );
       }
     }
@@ -156,10 +178,12 @@ export function conferir(
         matricula: f.matricula,
         nome: f.nome,
         setor: p.setor,
-        comissaoPdf: 0, gratificacaoPdf: 0, premioPdf: 0, adiantPremioPdf: 0,
+        arquivoPlan: p.arquivo,
+        comissaoPdf: 0, gratificacaoPdf: 0, gratificacaoNpsPdf: 0, premioPdf: 0, adiantPremioPdf: 0,
         baseInss: 0, valorFgts: 0, emprestimosPdf: 0,
         comissaoPlan: f.comissao,
         gratificacaoPlan: f.gratificacao,
+        gratificacaoNpsPlan: f.gratificacaoNps,
         premioPlan: f.premio,
         adiantPremioPlan: f.adiantPremio,
         emprestimosEsocialQtd: 0,
@@ -167,6 +191,33 @@ export function conferir(
         status: "so_planilha",
         divergencias: ["Funcionário existe na planilha de comissão mas NÃO está no PDF da folha"],
       });
+    }
+  }
+
+  // Avisos: planilhas com competência diferente do PDF (ainda assim incluídas)
+  const avisos: AvisoPlanilha[] = [];
+  if (pdf.competencia) {
+    for (const p of planilhas) {
+      if (p.competencia && p.competencia !== pdf.competencia) {
+        avisos.push({
+          arquivo: p.arquivo,
+          setor: p.setor,
+          tipo: "competencia_diferente",
+          detalhe: `Planilha ${p.arquivo} (${p.setor}) está em ${p.competencia}, mas o PDF é ${pdf.competencia}.`,
+        });
+      }
+    }
+  }
+  if (pdf.cnpj) {
+    for (const p of planilhas) {
+      if (p.cnpj && p.cnpj !== pdf.cnpj) {
+        avisos.push({
+          arquivo: p.arquivo,
+          setor: p.setor,
+          tipo: "cnpj_diferente",
+          detalhe: `Planilha ${p.arquivo} (${p.setor}${p.unidade ? ` — ${p.unidade}` : ""}) tem CNPJ ${p.cnpj}, diferente do PDF (${pdf.cnpj}).`,
+        });
+      }
     }
   }
 
@@ -178,9 +229,16 @@ export function conferir(
       acc.comissaoPlan += i.comissaoPlan;
       acc.gratificacaoPdf += i.gratificacaoPdf;
       acc.gratificacaoPlan += i.gratificacaoPlan;
+      acc.gratificacaoNpsPdf += i.gratificacaoNpsPdf;
+      acc.gratificacaoNpsPlan += i.gratificacaoNpsPlan;
       return acc;
     },
-    { funcionarios: 0, divergentes: 0, comissaoPdf: 0, comissaoPlan: 0, gratificacaoPdf: 0, gratificacaoPlan: 0 }
+    {
+      funcionarios: 0, divergentes: 0,
+      comissaoPdf: 0, comissaoPlan: 0,
+      gratificacaoPdf: 0, gratificacaoPlan: 0,
+      gratificacaoNpsPdf: 0, gratificacaoNpsPlan: 0,
+    }
   );
 
   return {
@@ -188,6 +246,7 @@ export function conferir(
     cnpj: pdf.cnpj,
     competencia: pdf.competencia,
     itens,
+    avisos,
     totais,
   };
 }

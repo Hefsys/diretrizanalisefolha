@@ -10,10 +10,11 @@ export interface PdfFuncionario {
   nome: string;
   cpf: string;
   situacao?: string;
-  comissao: number;       // verba 37
-  gratificacao: number;   // verba 20 + 286 (NPS)
-  premio: number;         // verba 219
-  adiantPremio: number;   // verba 241
+  comissao: number;        // verba 37
+  gratificacao: number;    // verba 20
+  gratificacaoNps: number; // verba 286 (NPS)
+  premio: number;          // verba 219
+  adiantPremio: number;    // verba 241
   baseInss: number;
   valorFgts: number;
   emprestimos: number;    // soma de "DESC. EMP. CRED. TRAB" descontos
@@ -63,7 +64,8 @@ const VALUE = /(\d{1,3}(?:\.\d{3})*,\d{2})/g;
 
 // Verbas relevantes (código no início da linha)
 const COD_COMISSAO = ["37"];
-const COD_GRATIF = ["20", "286"]; // 20=GRATIFICACOES, 286=GRATIFICACAO NPS
+const COD_GRATIF = ["20"];
+const COD_GRATIF_NPS = ["286"]; // GRATIFICACAO NPS (separada)
 const COD_PREMIO = ["219"];
 const COD_ADIANT_PREMIO = ["241"];
 
@@ -147,6 +149,7 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
     const block = aggregateLines.join(" \n ");
     current.comissao = tryExtractValueByCode(block, COD_COMISSAO);
     current.gratificacao = tryExtractValueByCode(block, COD_GRATIF);
+    current.gratificacaoNps = tryExtractValueByCode(block, COD_GRATIF_NPS);
     current.premio = tryExtractValueByCode(block, COD_PREMIO);
     current.adiantPremio = tryExtractValueByCode(block, COD_ADIANT_PREMIO);
     // Empréstimos descontados (linhas com "DESC. EMP. CRED. TRAB" + NUM D)
@@ -167,7 +170,7 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
         nome: head.nome,
         cpf: head.cpf,
         situacao: head.situacao,
-        comissao: 0, gratificacao: 0, premio: 0, adiantPremio: 0,
+        comissao: 0, gratificacao: 0, gratificacaoNps: 0, premio: 0, adiantPremio: 0,
         baseInss: 0, valorFgts: 0, emprestimos: 0, emprestimosCount: 0,
         proventos: 0, descontos: 0, liquido: 0,
       };

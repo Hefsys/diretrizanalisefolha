@@ -8,13 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { parseDominioPdf } from "@/lib/parsePdf";
-import { parseFolhaXls, parseEsocialXlsx } from "@/lib/parseXls";
+import { parseEsocialXlsx } from "@/lib/parseXls";
 import { conferir, type ConferenciaResult } from "@/lib/conferir";
 import { exportarPdf, exportarExcelDivergencias } from "@/lib/exporters";
 import { fmtBR } from "@/lib/normalize";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { FileText, FileSpreadsheet, Database, Play, Download, FileDown, AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { FileText, FileSpreadsheet, Database, Play, Download, FileDown, AlertTriangle, CheckCircle2, X, Info } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { parseFolhaXls as parseFolhaXlsLib, type PlanilhaParseResult } from "@/lib/parseXls";
 
 export const Route = createFileRoute("/app/")({
   component: NovaConferencia,
@@ -33,7 +35,28 @@ function NovaConferencia() {
   const [filtro, setFiltro] = useState<"todos" | "divergente" | "ok">("todos");
   const [busca, setBusca] = useState("");
 
+  const [filiaisPendentes, setFiliaisPendentes] = useState<PlanilhaParseResult[]>([]);
+  const [filialContext, setFilialContext] = useState<{
+    pdfData: Awaited<ReturnType<typeof parseDominioPdf>>;
+    todasPlan: PlanilhaParseResult[];
+    cnpjPdf: string;
+  } | null>(null);
+
   const pode = pdfFile && planFiles.length > 0;
+
+  const finalizarConferencia = async (
+    pdfData: Awaited<ReturnType<typeof parseDominioPdf>>,
+    planResults: PlanilhaParseResult[],
+  ) => {
+    const esocial = esocialFile ? await parseEsocialXlsx(esocialFile) : [];
+    if (esocialFile) toast.message(`eSocial: ${esocial.length} contratos.`);
+    const r = conferir(pdfData, planResults, esocial);
+    if (!empresa && r.empresa) setEmpresa(r.empresa);
+    if (!cnpj && r.cnpj) setCnpj(r.cnpj);
+    if (!competencia && r.competencia) setCompetencia(r.competencia);
+    setResult(r);
+    toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
+  };
 
   const handleConferir = async () => {
     if (!pdfFile || planFiles.length === 0) {
@@ -47,27 +70,50 @@ function NovaConferencia() {
       const pdfData = await parseDominioPdf(pdfBuf);
       toast.message(`PDF lido: ${pdfData.funcionarios.length} funcionários.`);
 
-      const planResults = [];
+      const planResults: PlanilhaParseResult[] = [];
       for (const f of planFiles) {
-        const r = await parseFolhaXls(f);
+        const r = await parseFolhaXlsLib(f);
         planResults.push(...r);
       }
       toast.message(`Planilhas lidas: ${planResults.reduce((a, p) => a + p.funcionarios.length, 0)} linhas.`);
 
-      const esocial = esocialFile ? await parseEsocialXlsx(esocialFile) : [];
-      if (esocialFile) toast.message(`eSocial: ${esocial.length} contratos de empréstimo.`);
+      // Detecta filiais (CNPJ diferente do PDF)
+      const cnpjPdf = pdfData.cnpj?.replace(/\D/g, "") ?? "";
+      const filiais = cnpjPdf
+        ? planResults.filter((p) => p.cnpj && p.cnpj !== cnpjPdf)
+        : [];
 
-      const r = conferir(pdfData, planResults, esocial);
-      // Preenche metadados se vazios
-      if (!empresa && r.empresa) setEmpresa(r.empresa);
-      if (!cnpj && r.cnpj) setCnpj(r.cnpj);
-      if (!competencia && r.competencia) setCompetencia(r.competencia);
-      setResult(r);
-      toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
+      if (filiais.length > 0) {
+        // Pergunta ao usuário antes de incluir filiais
+        setFilialContext({ pdfData, todasPlan: planResults, cnpjPdf });
+        setFiliaisPendentes(filiais);
+        setBusy(false);
+        return;
+      }
+
+      await finalizarConferencia(pdfData, planResults);
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar arquivos");
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const responderFiliais = async (incluir: boolean) => {
+    if (!filialContext) return;
+    setBusy(true);
+    try {
+      const { pdfData, todasPlan, cnpjPdf } = filialContext;
+      const planFinais = incluir
+        ? todasPlan
+        : todasPlan.filter((p) => !p.cnpj || p.cnpj === cnpjPdf);
+      await finalizarConferencia(pdfData, planFinais);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao processar");
+    } finally {
+      setFiliaisPendentes([]);
+      setFilialContext(null);
       setBusy(false);
     }
   };
@@ -204,6 +250,16 @@ function NovaConferencia() {
 
       {result && (
         <Card className="p-6 space-y-5">
+          {result.avisos.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-1">
+              <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                <Info className="h-4 w-4" /> Avisos da conferência
+              </div>
+              <ul className="text-xs text-amber-900 dark:text-amber-100 list-disc list-inside space-y-0.5">
+                {result.avisos.map((a, i) => <li key={i}>{a.detalhe}</li>)}
+              </ul>
+            </div>
+          )}
           <div className="grid md:grid-cols-4 gap-4">
             <Stat label="Funcionários" value={String(result.totais.funcionarios)} />
             <Stat label="Divergências" value={String(result.totais.divergentes)} variant={result.totais.divergentes > 0 ? "warn" : "ok"} />
@@ -240,8 +296,11 @@ function NovaConferencia() {
                   <th className="p-2 text-right">Comissão PDF</th>
                   <th className="p-2 text-right">Comissão Plan.</th>
                   <th className="p-2 text-right">Δ</th>
-                  <th className="p-2 text-right">Gratif. PDF</th>
-                  <th className="p-2 text-right">Gratif. Plan.</th>
+                  <th className="p-2 text-right">Gratif. 20 PDF</th>
+                  <th className="p-2 text-right">Gratif. 20 Plan.</th>
+                  <th className="p-2 text-right">Δ</th>
+                  <th className="p-2 text-right">NPS 286 PDF</th>
+                  <th className="p-2 text-right">NPS 286 Plan.</th>
                   <th className="p-2 text-right">Δ</th>
                   <th className="p-2 text-right">Base INSS</th>
                   <th className="p-2 text-right">FGTS</th>
@@ -252,6 +311,7 @@ function NovaConferencia() {
                 {itensFiltrados.map((i, idx) => {
                   const dC = i.comissaoPdf - i.comissaoPlan;
                   const dG = i.gratificacaoPdf - i.gratificacaoPlan;
+                  const dN = i.gratificacaoNpsPdf - i.gratificacaoNpsPlan;
                   return (
                     <tr key={idx} className="border-t hover:bg-muted/40">
                       <td className="p-2">
@@ -268,6 +328,9 @@ function NovaConferencia() {
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoPdf)}</td>
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoPlan)}</td>
                       <td className={`p-2 text-right tabular-nums font-semibold ${Math.abs(dG) > 0.05 ? "text-destructive" : "text-muted-foreground"}`}>{fmtBR(dG)}</td>
+                      <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoNpsPdf)}</td>
+                      <td className="p-2 text-right tabular-nums">{fmtBR(i.gratificacaoNpsPlan)}</td>
+                      <td className={`p-2 text-right tabular-nums font-semibold ${Math.abs(dN) > 0.05 ? "text-destructive" : "text-muted-foreground"}`}>{fmtBR(dN)}</td>
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.baseInss)}</td>
                       <td className="p-2 text-right tabular-nums">{fmtBR(i.valorFgts)}</td>
                       <td className="p-2 text-center">{i.emprestimosEsocialQtd > 0 ? <Badge variant="secondary">{i.emprestimosEsocialQtd}</Badge> : "—"}</td>
@@ -275,13 +338,35 @@ function NovaConferencia() {
                   );
                 })}
                 {itensFiltrados.length === 0 && (
-                  <tr><td colSpan={13} className="text-center text-muted-foreground p-6">Nenhum item para o filtro atual.</td></tr>
+                  <tr><td colSpan={16} className="text-center text-muted-foreground p-6">Nenhum item para o filtro atual.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </Card>
       )}
+
+      <AlertDialog open={filiaisPendentes.length > 0} onOpenChange={(o) => !o && responderFiliais(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Planilhas de filial detectadas</AlertDialogTitle>
+            <AlertDialogDescription>
+              As planilhas abaixo têm CNPJ diferente do PDF do Domínio. Deseja incluí-las na conferência mesmo assim?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="text-sm space-y-1 max-h-60 overflow-auto bg-muted/40 rounded p-3">
+            {filiaisPendentes.map((p, i) => (
+              <li key={i} className="font-mono text-xs">
+                <strong>{p.arquivo}</strong> — {p.setor}{p.unidade ? ` (${p.unidade})` : ""} · CNPJ {p.cnpj}
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => responderFiliais(false)}>Ignorar filiais</AlertDialogCancel>
+            <AlertDialogAction onClick={() => responderFiliais(true)}>Incluir todas</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
