@@ -14,7 +14,167 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      conferencia_itens: {
+        Row: {
+          base_inss: number | null
+          comissao_pdf: number | null
+          comissao_planilha: number | null
+          conferencia_id: string
+          cpf: string | null
+          created_at: string
+          divergencias: Json | null
+          emprestimos_esocial_qtd: number | null
+          emprestimos_pdf: number | null
+          gratificacao_pdf: number | null
+          gratificacao_planilha: number | null
+          id: string
+          matricula: string | null
+          nome: string
+          premio_pdf: number | null
+          premio_planilha: number | null
+          setor: string | null
+          status: string
+          valor_fgts: number | null
+        }
+        Insert: {
+          base_inss?: number | null
+          comissao_pdf?: number | null
+          comissao_planilha?: number | null
+          conferencia_id: string
+          cpf?: string | null
+          created_at?: string
+          divergencias?: Json | null
+          emprestimos_esocial_qtd?: number | null
+          emprestimos_pdf?: number | null
+          gratificacao_pdf?: number | null
+          gratificacao_planilha?: number | null
+          id?: string
+          matricula?: string | null
+          nome: string
+          premio_pdf?: number | null
+          premio_planilha?: number | null
+          setor?: string | null
+          status?: string
+          valor_fgts?: number | null
+        }
+        Update: {
+          base_inss?: number | null
+          comissao_pdf?: number | null
+          comissao_planilha?: number | null
+          conferencia_id?: string
+          cpf?: string | null
+          created_at?: string
+          divergencias?: Json | null
+          emprestimos_esocial_qtd?: number | null
+          emprestimos_pdf?: number | null
+          gratificacao_pdf?: number | null
+          gratificacao_planilha?: number | null
+          id?: string
+          matricula?: string | null
+          nome?: string
+          premio_pdf?: number | null
+          premio_planilha?: number | null
+          setor?: string | null
+          status?: string
+          valor_fgts?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conferencia_itens_conferencia_id_fkey"
+            columns: ["conferencia_id"]
+            isOneToOne: false
+            referencedRelation: "conferencias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conferencias: {
+        Row: {
+          cnpj: string | null
+          competencia: string
+          created_at: string
+          empresa: string | null
+          esocial_nome: string | null
+          id: string
+          observacoes: string | null
+          pdf_nome: string | null
+          planilhas_nomes: string[] | null
+          total_comissao_pdf: number | null
+          total_comissao_planilha: number | null
+          total_divergencias: number
+          total_funcionarios: number
+          total_gratificacao_pdf: number | null
+          total_gratificacao_planilha: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cnpj?: string | null
+          competencia: string
+          created_at?: string
+          empresa?: string | null
+          esocial_nome?: string | null
+          id?: string
+          observacoes?: string | null
+          pdf_nome?: string | null
+          planilhas_nomes?: string[] | null
+          total_comissao_pdf?: number | null
+          total_comissao_planilha?: number | null
+          total_divergencias?: number
+          total_funcionarios?: number
+          total_gratificacao_pdf?: number | null
+          total_gratificacao_planilha?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cnpj?: string | null
+          competencia?: string
+          created_at?: string
+          empresa?: string | null
+          esocial_nome?: string | null
+          id?: string
+          observacoes?: string | null
+          pdf_nome?: string | null
+          planilhas_nomes?: string[] | null
+          total_comissao_pdf?: number | null
+          total_comissao_planilha?: number | null
+          total_divergencias?: number
+          total_funcionarios?: number
+          total_gratificacao_pdf?: number | null
+          total_gratificacao_planilha?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
