@@ -10,10 +10,11 @@ export interface PdfFuncionario {
   nome: string;
   cpf: string;
   situacao?: string;
-  comissao: number;       // verba 37
-  gratificacao: number;   // verba 20 + 286 (NPS)
-  premio: number;         // verba 219
-  adiantPremio: number;   // verba 241
+  comissao: number;        // verba 37
+  gratificacao: number;    // verba 20
+  gratificacaoNps: number; // verba 286 (NPS)
+  premio: number;          // verba 219
+  adiantPremio: number;    // verba 241
   baseInss: number;
   valorFgts: number;
   emprestimos: number;    // soma de "DESC. EMP. CRED. TRAB" descontos
