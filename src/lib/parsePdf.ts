@@ -64,7 +64,8 @@ const VALUE = /(\d{1,3}(?:\.\d{3})*,\d{2})/g;
 
 // Verbas relevantes (código no início da linha)
 const COD_COMISSAO = ["37"];
-const COD_GRATIF = ["20", "286"]; // 20=GRATIFICACOES, 286=GRATIFICACAO NPS
+const COD_GRATIF = ["20"];
+const COD_GRATIF_NPS = ["286"]; // GRATIFICACAO NPS (separada)
 const COD_PREMIO = ["219"];
 const COD_ADIANT_PREMIO = ["241"];
 
