@@ -1,114 +1,40 @@
-# Dashboard por Colaborador com Comparativo Mensal
+## Contexto
 
-## O que muda na experiência
+Hoje o sistema lê comissão (37), gratificação (20), gratificação NPS (286), prêmio (219) e adiantamento de prêmio (241) tanto do PDF da folha quanto das planilhas dos setores, e marca como **divergente** quando não batem. Na prática esses valores **nunca aparecem no PDF** — eles só existem nas planilhas e devem ser **adicionados ao colaborador** na próxima folha.
 
-Hoje a tela principal foca em "OK / Divergente". A nova proposta inverte o foco: depois de subir os arquivos, o usuário vê **um dashboard rico por colaborador**, com abas e comparação automática com o mês anterior (puxado do histórico salvo).
+## O que muda
 
-A tela de conferência (PDF × Planilha × eSocial) continua existindo, mas como **aba secundária**, para quem quiser ver divergências.
+### 1. `src/lib/conferir.ts` — parar de comparar
+- Remover os 5 blocos de `approxEqual` que geram divergências de Comissão/Gratificação/NPS/Prêmio/Adiant. Prêmio.
+- Manter os campos `*Pdf` e `*Plan` no `ConferenciaItem` (continuam sendo gravados no banco, zerados no PDF), apenas sem gerar `divergencias`.
+- Funcionários que existem só na planilha continuam com status `so_planilha`, mas **não contam mais como alarme** — passam a ser tratados como "a lançar".
+- Atualizar o cálculo de `totais.divergentes` para considerar apenas status `divergente` (e não mais `so_planilha` nem `so_pdf` quando a única diferença for esses 5 campos).
 
-## Nova navegação
+### 2. `src/routes/app.dashboard.$id.tsx` — nova aba "A Lançar"
+- Adicionar aba **"A Lançar"** (ao lado de Visão Geral / Empréstimos / Comissões / Benefícios).
+- Lista todos os colaboradores com qualquer valor > 0 em `comissao_planilha`, `gratificacao_planilha`, `gratificacao_nps_planilha`, `premio_planilha`, `adiant_premio_planilha`.
+- Colunas: Nome, Setor, Comissão, Gratif. 20, Gratif. NPS 286, Prêmio, Adiant. Prêmio, **Total a lançar**.
+- Linha de total no rodapé somando cada coluna.
+- Botão "Exportar CSV" para entregar à folha.
+- Na aba **Comissões** existente: trocar o título "PDF vs Planilha" por "Valores a lançar (planilha)" e mostrar só a coluna da planilha.
 
-Dentro de `/app`:
+### 3. `src/routes/app.index.tsx` — aba Conferência
+- No card de resumo, separar os contadores: **Divergências reais** vs **A lançar (só planilha)**.
+- Itens com status `so_planilha` recebem badge neutra "A lançar" (azul) em vez de vermelha.
+- Tirar do contador principal de divergências exibido no topo.
 
-```text
-[ Visão Geral ] [ Empréstimos ] [ Comissões ] [ Benefícios ] [ Conferência ]
-```
+### 4. `src/routes/app.historico.tsx`
+- Renomear coluna "Divergências" para refletir a nova lógica e adicionar coluna "A lançar" (derivada de `total_funcionarios - itens_ok` ou recalculada).
+- Não precisa migration: o número de divergências salvo passa a ser apenas as reais.
 
-Topo da tela (sempre visível):
-- Seletor de competência (ex: 03/2026)
-- Empresa / CNPJ
-- Indicador "Comparando com: 02/2026" (auto-detectado pelo histórico)
-- Botão "Trocar competência anterior" (caso queira escolher outro mês base)
+## O que NÃO muda
 
-### Aba 1 — Visão Geral
-KPIs do mês com variação (▲/▼ %) vs mês anterior:
-- Total de funcionários
-- Total de empréstimos consignados (qtd contratos)
-- Soma das parcelas de empréstimos
-- Total comissão (37)
-- Total gratificação (20 + NPS 286)
-- Total prêmio (219)
-- Total benefícios (VT, VR, plano de saúde)
-- Total Base INSS / FGTS
+- Schema do banco: continua salvando `*_pdf` (zerado) e `*_planilha` (valor real). Útil pra histórico e caso um dia comecem a vir no PDF.
+- Conferência de **empréstimos** (PDF × eSocial) — continua igual, isso aí faz sentido comparar.
+- Conferência de **base INSS / FGTS / benefícios** — continua igual (esses vêm do PDF mesmo).
 
-Ex.: "Empréstimos: **52** ▲ +2 vs 02/2026 (50)"
+## Resultado esperado
 
-Embaixo, **lista de colaboradores** com busca, mostrando colunas resumidas (nome, setor, qtd empréstimos, comissão, Δ vs mês anterior). Clicar abre o **detalhe do colaborador** em painel lateral / página dedicada.
-
-### Aba 2 — Empréstimos
-Tabela por colaborador:
-- Nome / Matrícula / CPF
-- Qtd contratos (mês atual) | Qtd mês anterior | Δ
-- Bancos (lista)
-- Soma parcelas mês | mês anterior | Δ R$
-- Detalhe expansível: cada contrato (banco, nº contrato, parcela, parcelas restantes — o que vier do eSocial)
-
-### Aba 3 — Comissões
-Tabela por colaborador:
-- Comissão 37 | mês anterior | Δ R$ / Δ %
-- Gratificação 20 | anterior | Δ
-- NPS 286 | anterior | Δ
-- Prêmio 219 | anterior | Δ
-- Adiant. Prêmio 241 | anterior | Δ
-- Total variável | anterior | Δ
-
-### Aba 4 — Benefícios
-Tabela por colaborador:
-- VT, VR, plano de saúde, outros descontos identificados no PDF
-- Coluna "mês anterior" e Δ para cada benefício
-- Base INSS, Base FGTS, Salário-base com variação
-
-### Aba 5 — Conferência (existente)
-Mantém a tela atual com tabela OK/Divergente, painel de avisos e exportação PDF/Excel.
-
-### Detalhe do colaborador (drawer)
-Acessível clicando em qualquer linha em qualquer aba. Mostra tudo do colaborador num único painel:
-- Cabeçalho: nome, matrícula, CPF, setor, status conferência
-- Card Empréstimos | Card Comissões | Card Benefícios | Card Bases
-- Cada card com valor atual, valor mês anterior e variação
-- Mini-gráfico (sparkline) se houver 3+ meses no histórico
-
-## Como funciona o comparativo (técnico)
-
-Você escolheu **"usar histórico salvo no banco"**. Fluxo:
-
-1. Usuário sobe PDF + planilhas → sistema processa e salva em `conferencias` + `conferencia_itens` (já existe).
-2. Ao abrir o dashboard de uma competência (ex: 03/2026), o sistema busca automaticamente a conferência anterior do mesmo CNPJ (ex: 02/2026) via server function.
-3. Faz o "merge" colaborador a colaborador (chave: CPF → matrícula → nome) e calcula deltas em memória.
-4. Se não houver mês anterior salvo, o dashboard mostra apenas o mês atual com aviso "Sem histórico para comparar".
-
-## O que precisa mudar no código
-
-### Banco
-Para suportar empréstimos e benefícios detalhados, precisamos guardar mais campos por item:
-- Adicionar colunas em `conferencia_itens`: `gratificacao_nps_pdf`, `gratificacao_nps_planilha`, `adiant_premio_pdf`, `adiant_premio_planilha`, `premio_pdf` (já existe), `salario_base`, `vale_transporte`, `vale_refeicao`, `plano_saude`, `outros_beneficios` (jsonb)
-- Nova tabela `conferencia_emprestimos` (1-N): `id`, `item_id`, `banco`, `numero_contrato`, `parcela`, `parcelas_restantes`, `origem` (pdf/esocial)
-
-(RLS já cascateia via `conferencia_id`.)
-
-### Parsers
-- `parsePdf.ts`: extrair também VT, VR, plano de saúde, salário-base e parcelas individuais de empréstimos consignados (já lê o total — separar por contrato).
-- `parseXls.ts`: nada novo.
-
-### Server functions (novas em `src/server/dashboard.functions.ts`)
-- `getDashboard({ conferenciaId })` → retorna dados da competência + dados da competência anterior (mesmo CNPJ) já mergeados por colaborador, com deltas calculados.
-- `getColaboradorDetalhe({ conferenciaId, cpf })` → detalhe completo de 1 colaborador com histórico dos últimos N meses (para sparkline).
-
-### Rotas
-- `src/routes/app.dashboard.$conferenciaId.tsx` → nova rota com as abas
-- `src/routes/app.index.tsx` → vira a tela de upload + lista de conferências recentes; após processar, redireciona para `/app/dashboard/:id`
-- `src/routes/app.historico.tsx` → mantém
-
-### Componentes novos
-- `DashboardTabs.tsx` (wrapper das abas)
-- `KpiCard.tsx` (valor + delta + ícone tendência)
-- `ColaboradorRow.tsx` (linha com delta inline)
-- `ColaboradorDrawer.tsx` (detalhe lateral)
-- `EmprestimosTable.tsx`, `ComissoesTable.tsx`, `BeneficiosTable.tsx`
-
-## Fora do escopo desta etapa
-- Sparkline com 3+ meses (vai aparecer só quando houver histórico suficiente)
-- Edição manual de valores no dashboard
-- Exportação PDF do dashboard (a exportação atual da conferência continua)
-
-Confirma que posso seguir com essa estrutura?
+- Nenhum colaborador é mais marcado como divergente só por ter comissão/gratificação/prêmio na planilha.
+- Nova aba "A Lançar" no dashboard mostra exatamente quem precisa receber o quê na próxima folha, com total geral e exportação CSV.
+- Contador de divergências passa a refletir apenas problemas reais (empréstimos no eSocial não batendo com PDF, valores divergentes, etc.).
