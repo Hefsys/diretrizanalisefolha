@@ -153,22 +153,67 @@ function NovaConferencia() {
         comissao_planilha: i.comissaoPlan,
         gratificacao_pdf: i.gratificacaoPdf,
         gratificacao_planilha: i.gratificacaoPlan,
+        gratificacao_nps_pdf: i.gratificacaoNpsPdf,
+        gratificacao_nps_planilha: i.gratificacaoNpsPlan,
         premio_pdf: i.premioPdf,
         premio_planilha: i.premioPlan,
+        adiant_premio_pdf: i.adiantPremioPdf,
+        adiant_premio_planilha: i.adiantPremioPlan,
+        salario_base: i.salarioBase,
+        vale_transporte: i.valeTransporte,
+        vale_refeicao: i.valeRefeicao,
+        plano_saude: i.planoSaude,
         base_inss: i.baseInss,
         valor_fgts: i.valorFgts,
         emprestimos_pdf: i.emprestimosPdf,
         emprestimos_esocial_qtd: i.emprestimosEsocialQtd,
+        bancos_esocial: i.bancosEsocial,
         status: i.status,
         divergencias: i.divergencias,
       }));
-      // Insert em batches de 500
-      for (let i = 0; i < itens.length; i += 500) {
-        const slice = itens.slice(i, i + 500);
-        const { error: e2 } = await supabase.from("conferencia_itens").insert(slice);
+      // Insert em batches e captura os IDs para vincular empréstimos
+      const insertedItens: { id: string; cpf: string | null; matricula: string | null; nome: string }[] = [];
+      for (let idx = 0; idx < itens.length; idx += 500) {
+        const slice = itens.slice(idx, idx + 500);
+        const { data: ins, error: e2 } = await supabase
+          .from("conferencia_itens")
+          .insert(slice)
+          .select("id, cpf, matricula, nome");
         if (e2) throw e2;
+        if (ins) insertedItens.push(...ins);
       }
-      toast.success("Conferência salva no histórico.");
+
+      // Empréstimos detalhados
+      const empRows: Array<Record<string, unknown>> = [];
+      for (const item of result.itens) {
+        if (!item.emprestimosLista || item.emprestimosLista.length === 0) continue;
+        const matched = insertedItens.find(
+          (x) => (item.cpf && x.cpf === item.cpf) ||
+                 (item.matricula && x.matricula === item.matricula) ||
+                 x.nome === item.nome,
+        );
+        if (!matched) continue;
+        for (const e of item.emprestimosLista) {
+          empRows.push({
+            item_id: matched.id,
+            conferencia_id: conf.id,
+            banco: e.banco ?? null,
+            numero_contrato: e.numeroContrato ?? null,
+            parcela: e.parcela,
+            origem: "pdf",
+          });
+        }
+      }
+      if (empRows.length > 0) {
+        for (let idx = 0; idx < empRows.length; idx += 500) {
+          const slice = empRows.slice(idx, idx + 500);
+          const { error: e3 } = await supabase.from("conferencia_emprestimos").insert(slice);
+          if (e3) throw e3;
+        }
+      }
+
+      toast.success("Conferência salva — abrindo dashboard.");
+      navigate({ to: "/app/dashboard/$id", params: { id: conf.id } });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Erro ao salvar");
     }
