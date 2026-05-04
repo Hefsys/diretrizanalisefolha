@@ -136,9 +136,14 @@ function NovaConferencia() {
     }
   };
 
-  const handleSalvar = async () => {
-    if (!result || !user) return;
+  const salvarConferencia = async (resultToSave: ConferenciaResult) => {
+    if (!user) {
+      toast.error("Faça login para salvar.");
+      return;
+    }
+    const result = resultToSave;
     try {
+      toast.message("Salvando no banco…");
       const { data: conf, error } = await supabase
         .from("conferencias")
         .insert({
