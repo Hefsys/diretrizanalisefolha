@@ -128,7 +128,8 @@ function NovaConferencia() {
       const planFinais = incluir
         ? todasPlan
         : todasPlan.filter((p) => !p.cnpj || p.cnpj === cnpjPdf);
-      await finalizarConferencia(pdfData, planFinais);
+      const r = await finalizarConferencia(pdfData, planFinais);
+      if (r) await salvarConferencia(r);
     } catch (err: unknown) {
       console.error("[responderFiliais]", err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar");
