@@ -192,7 +192,8 @@ function NovaConferencia() {
     }
     const result = resultToSave;
     try {
-      toast.message("Salvando no banco…");
+      setEtapa("salvando", "running", "criando conferência…");
+      await yieldUI();
       const { data: conf, error } = await supabase
         .from("conferencias")
         .insert({
@@ -245,6 +246,8 @@ function NovaConferencia() {
       // Insert em batches e captura os IDs para vincular empréstimos
       const insertedItens: { id: string; cpf: string | null; matricula: string | null; nome: string }[] = [];
       for (let idx = 0; idx < itens.length; idx += 500) {
+        setEtapa("salvando", "running", `itens ${Math.min(idx + 500, itens.length)}/${itens.length}`);
+        await yieldUI();
         const slice = itens.slice(idx, idx + 500);
         const { data: ins, error: e2 } = await supabase
           .from("conferencia_itens")
@@ -277,15 +280,20 @@ function NovaConferencia() {
       }
       if (empRows.length > 0) {
         for (let idx = 0; idx < empRows.length; idx += 500) {
+          setEtapa("salvando", "running", `empréstimos ${Math.min(idx + 500, empRows.length)}/${empRows.length}`);
+          await yieldUI();
           const slice = empRows.slice(idx, idx + 500);
           const { error: e3 } = await supabase.from("conferencia_emprestimos").insert(slice);
           if (e3) throw e3;
         }
       }
 
-      toast.success("Conferência salva — abrindo dashboard.");
+      setEtapa("salvando", "done", `${itens.length} itens · ${empRows.length} empréstimos`);
+      setEtapa("redirecionando", "running");
+      await yieldUI();
       navigate({ to: "/app/dashboard/$id", params: { id: conf.id } });
     } catch (err: unknown) {
+      setEtapa("salvando", "error", err instanceof Error ? err.message : "erro");
       toast.error(err instanceof Error ? err.message : "Erro ao salvar");
     }
   };
