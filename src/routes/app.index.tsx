@@ -83,22 +83,31 @@ function NovaConferencia() {
   ) => {
     let esocial: Awaited<ReturnType<typeof parseEsocialXlsx>> = [];
     if (esocialFile) {
-      toast.message("Lendo eSocial…");
+      setEtapa("esocial", "running", `${(esocialFile.size / 1024).toFixed(0)} KB`);
       console.log("[conferir] iniciando parse eSocial", esocialFile.name, esocialFile.size);
       await yieldUI();
-      esocial = await parseEsocialXlsx(esocialFile);
-      console.log("[conferir] eSocial parseado:", esocial.length);
-      toast.message(`eSocial: ${esocial.length} contratos.`);
+      try {
+        esocial = await parseEsocialXlsx(esocialFile);
+        setEtapa("esocial", "done", `${esocial.length} contratos`);
+        console.log("[conferir] eSocial parseado:", esocial.length);
+      } catch (e) {
+        setEtapa("esocial", "error", e instanceof Error ? e.message : "falhou");
+        throw e;
+      }
       await yieldUI();
+    } else {
+      setEtapa("esocial", "done", "não enviado");
     }
+    setEtapa("conferindo", "running");
+    await yieldUI();
     console.log("[conferir] iniciando merge");
     const r = conferir(pdfData, planResults, esocial);
     console.log("[conferir] merge concluído:", r.itens.length, "itens");
+    setEtapa("conferindo", "done", `${r.itens.length} funcionários · ${r.totais.divergentes} divergências`);
     if (!empresa && r.empresa) setEmpresa(r.empresa);
     if (!cnpj && r.cnpj) setCnpj(r.cnpj);
     if (!competencia && r.competencia) setCompetencia(r.competencia);
     setResult(r);
-    toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
     return r;
   };
 
@@ -107,19 +116,27 @@ function NovaConferencia() {
       toast.error("Envie o PDF do Domínio e ao menos uma planilha de comissão.");
       return;
     }
+    resetEtapas();
     setBusy(true);
     try {
-      toast.message("Lendo PDF do Domínio…");
+      setEtapa("pdf", "running", `${(pdfFile.size / 1024).toFixed(0)} KB`);
+      await yieldUI();
       const pdfBuf = await pdfFile.arrayBuffer();
       const pdfData = await parseDominioPdf(pdfBuf);
-      toast.message(`PDF lido: ${pdfData.funcionarios.length} funcionários.`);
+      setEtapa("pdf", "done", `${pdfData.funcionarios.length} funcionários`);
+      await yieldUI();
 
+      setEtapa("planilhas", "running", `0/${planFiles.length}`);
       const planResults: PlanilhaParseResult[] = [];
-      for (const f of planFiles) {
-        const r = await parseFolhaXlsLib(f);
+      for (let i = 0; i < planFiles.length; i++) {
+        setEtapa("planilhas", "running", `${i + 1}/${planFiles.length} · ${planFiles[i].name}`);
+        await yieldUI();
+        const r = await parseFolhaXlsLib(planFiles[i]);
         planResults.push(...r);
       }
-      toast.message(`Planilhas lidas: ${planResults.reduce((a, p) => a + p.funcionarios.length, 0)} linhas.`);
+      const totalLinhas = planResults.reduce((a, p) => a + p.funcionarios.length, 0);
+      setEtapa("planilhas", "done", `${totalLinhas} linhas em ${planResults.length} setores`);
+      await yieldUI();
 
       // Detecta filiais (CNPJ diferente do PDF)
       const cnpjPdf = pdfData.cnpj?.replace(/\D/g, "") ?? "";
