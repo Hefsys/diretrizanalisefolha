@@ -104,7 +104,7 @@ function NovaConferencia() {
     console.log("[conferir] iniciando merge");
     const r = conferir(pdfData, planResults, esocial);
     console.log("[conferir] merge concluído:", r.itens.length, "itens");
-    setEtapa("conferindo", "done", `${r.itens.length} funcionários · ${r.totais.divergentes} divergências`);
+    setEtapa("conferindo", "done", `${r.itens.length} funcionários · ${r.totais.divergentes} divergências · ${r.totais.aLancar} a lançar`);
     if (!empresa && r.empresa) setEmpresa(r.empresa);
     if (!cnpj && r.cnpj) setCnpj(r.cnpj);
     if (!competencia && r.competencia) setCompetencia(r.competencia);
