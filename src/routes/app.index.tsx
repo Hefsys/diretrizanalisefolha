@@ -184,7 +184,7 @@ function NovaConferencia() {
       }
 
       // Empréstimos detalhados
-      const empRows: Array<Record<string, unknown>> = [];
+      const empRows: Array<{ item_id: string; conferencia_id: string; banco: string | null; numero_contrato: string | null; parcela: number; origem: string }> = [];
       for (const item of result.itens) {
         if (!item.emprestimosLista || item.emprestimosLista.length === 0) continue;
         const matched = insertedItens.find(
