@@ -395,8 +395,8 @@ function NovaConferencia() {
           <div className="grid md:grid-cols-4 gap-4">
             <Stat label="Funcionários" value={String(result.totais.funcionarios)} />
             <Stat label="Divergências" value={String(result.totais.divergentes)} variant={result.totais.divergentes > 0 ? "warn" : "ok"} />
-            <Stat label="Δ Comissão (PDF − Planilha)" value={`R$ ${fmtBR(result.totais.comissaoPdf - result.totais.comissaoPlan)}`} />
-            <Stat label="Δ Gratificação (PDF − Planilha)" value={`R$ ${fmtBR(result.totais.gratificacaoPdf - result.totais.gratificacaoPlan)}`} />
+            <Stat label="A lançar (só planilha)" value={String(result.totais.aLancar)} />
+            <Stat label="Total Comissão Planilha" value={`R$ ${fmtBR(result.totais.comissaoPlan)}`} />
           </div>
 
           <div className="flex flex-wrap gap-3 items-end justify-between">
@@ -404,7 +404,7 @@ function NovaConferencia() {
               <TabsList>
                 <TabsTrigger value="todos">Todos ({result.itens.length})</TabsTrigger>
                 <TabsTrigger value="divergente">Divergentes ({result.totais.divergentes})</TabsTrigger>
-                <TabsTrigger value="ok">OK ({result.itens.length - result.totais.divergentes})</TabsTrigger>
+                <TabsTrigger value="ok">OK ({result.itens.filter(i => i.status === "ok").length})</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="flex gap-2 flex-1 max-w-md">
