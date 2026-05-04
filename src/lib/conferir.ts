@@ -202,7 +202,8 @@ export function conferir(
   const totais = itens.reduce(
     (acc, i) => {
       acc.funcionarios += 1;
-      if (i.status !== "ok") acc.divergentes += 1;
+      if (i.status === "divergente") acc.divergentes += 1;
+      if (i.status === "so_planilha") acc.aLancar += 1;
       acc.comissaoPdf += i.comissaoPdf;
       acc.comissaoPlan += i.comissaoPlan;
       acc.gratificacaoPdf += i.gratificacaoPdf;
