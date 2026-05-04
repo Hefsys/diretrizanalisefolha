@@ -373,6 +373,10 @@ function NovaConferencia() {
         </div>
       </Card>
 
+      {(busy || Object.values(etapas).some((e) => e.status !== "pending")) && (
+        <ProgressoEtapas etapas={ETAPAS} estado={etapas} />
+      )}
+
       {result && (
         <Card className="p-6 space-y-5">
           {result.avisos.length > 0 && (
