@@ -55,6 +55,7 @@ export interface ConferenciaResult {
   totais: {
     funcionarios: number;
     divergentes: number;
+    aLancar: number;
     comissaoPdf: number;
     comissaoPlan: number;
     gratificacaoPdf: number;
