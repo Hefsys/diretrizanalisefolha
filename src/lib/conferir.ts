@@ -135,11 +135,28 @@ export function conferir(
       divergencias: [],
     };
 
-    // Comissão/Gratificação/NPS/Prêmio/Adiant. Prêmio NÃO vêm no PDF — vêm só nas planilhas
-    // e devem ser ADICIONADOS ao colaborador na próxima folha. Por isso não comparamos.
-    if (!planEntry) {
-      // Funcionário só no PDF, sem planilha de variáveis: ok, sem nada a lançar.
-      // Não marca como divergência.
+    // A folha do PDF já vem validada — comparamos as verbas variáveis com as planilhas
+    // para detectar divergências de lançamento. Empréstimos do eSocial seguem como
+    // dado a ADICIONAR (sem alarme), tratado fora deste bloco.
+    const fmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const cmp = (label: string, pdf: number, plan: number) => {
+      const dif = pdf - plan;
+      if (Math.abs(dif) <= TOL) return;
+      if (pdf === 0 && plan > 0) {
+        item.divergencias.push(`${label}: falta lançar no PDF (planilha ${fmt(plan)})`);
+      } else if (plan === 0 && pdf > 0) {
+        item.divergencias.push(`${label}: não consta na planilha (PDF ${fmt(pdf)})`);
+      } else {
+        item.divergencias.push(`${label}: PDF ${fmt(pdf)} × Planilha ${fmt(plan)} (dif ${fmt(dif)})`);
+      }
+    };
+
+    if (planEntry) {
+      cmp("Comissão (37)", item.comissaoPdf, item.comissaoPlan);
+      cmp("Gratificação (20)", item.gratificacaoPdf, item.gratificacaoPlan);
+      cmp("Gratificação NPS (286)", item.gratificacaoNpsPdf, item.gratificacaoNpsPlan);
+      cmp("Prêmio (219)", item.premioPdf, item.premioPlan);
+      cmp("Adiant. Prêmio (241)", item.adiantPremioPdf, item.adiantPremioPlan);
     }
 
     if (item.divergencias.length > 0 && item.status === "ok") item.status = "divergente";
