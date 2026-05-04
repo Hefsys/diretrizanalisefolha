@@ -449,7 +449,9 @@ function NovaConferencia() {
                       <td className="p-2">
                         {i.status === "ok"
                           ? <Badge variant="outline" className="border-success/40 text-success bg-success/5"><CheckCircle2 className="h-3 w-3 mr-1" />OK</Badge>
-                          : <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/5"><AlertTriangle className="h-3 w-3 mr-1" />{i.status === "divergente" ? "Divergente" : i.status === "so_pdf" ? "Só no PDF" : "Só na planilha"}</Badge>}
+                          : i.status === "so_planilha"
+                            ? <Badge variant="outline" className="border-blue-500/40 text-blue-600 bg-blue-500/5">A lançar</Badge>
+                            : <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/5"><AlertTriangle className="h-3 w-3 mr-1" />{i.status === "divergente" ? "Divergente" : "Só no PDF"}</Badge>}
                       </td>
                       <td className="p-2">{i.matricula || "—"}</td>
                       <td className="p-2 font-medium">{i.nome}</td>
