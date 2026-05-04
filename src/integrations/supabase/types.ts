@@ -14,8 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      conferencia_emprestimos: {
+        Row: {
+          banco: string | null
+          conferencia_id: string
+          created_at: string
+          id: string
+          item_id: string
+          numero_contrato: string | null
+          origem: string
+          parcela: number | null
+          parcelas_restantes: number | null
+        }
+        Insert: {
+          banco?: string | null
+          conferencia_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          numero_contrato?: string | null
+          origem?: string
+          parcela?: number | null
+          parcelas_restantes?: number | null
+        }
+        Update: {
+          banco?: string | null
+          conferencia_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          numero_contrato?: string | null
+          origem?: string
+          parcela?: number | null
+          parcelas_restantes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conferencia_emprestimos_conferencia_id_fkey"
+            columns: ["conferencia_id"]
+            isOneToOne: false
+            referencedRelation: "conferencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conferencia_emprestimos_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "conferencia_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conferencia_itens: {
         Row: {
+          adiant_premio_pdf: number | null
+          adiant_premio_planilha: number | null
+          bancos_esocial: Json | null
           base_inss: number | null
           comissao_pdf: number | null
           comissao_planilha: number | null
@@ -25,18 +79,28 @@ export type Database = {
           divergencias: Json | null
           emprestimos_esocial_qtd: number | null
           emprestimos_pdf: number | null
+          gratificacao_nps_pdf: number | null
+          gratificacao_nps_planilha: number | null
           gratificacao_pdf: number | null
           gratificacao_planilha: number | null
           id: string
           matricula: string | null
           nome: string
+          outros_beneficios: Json | null
+          plano_saude: number | null
           premio_pdf: number | null
           premio_planilha: number | null
+          salario_base: number | null
           setor: string | null
           status: string
+          vale_refeicao: number | null
+          vale_transporte: number | null
           valor_fgts: number | null
         }
         Insert: {
+          adiant_premio_pdf?: number | null
+          adiant_premio_planilha?: number | null
+          bancos_esocial?: Json | null
           base_inss?: number | null
           comissao_pdf?: number | null
           comissao_planilha?: number | null
@@ -46,18 +110,28 @@ export type Database = {
           divergencias?: Json | null
           emprestimos_esocial_qtd?: number | null
           emprestimos_pdf?: number | null
+          gratificacao_nps_pdf?: number | null
+          gratificacao_nps_planilha?: number | null
           gratificacao_pdf?: number | null
           gratificacao_planilha?: number | null
           id?: string
           matricula?: string | null
           nome: string
+          outros_beneficios?: Json | null
+          plano_saude?: number | null
           premio_pdf?: number | null
           premio_planilha?: number | null
+          salario_base?: number | null
           setor?: string | null
           status?: string
+          vale_refeicao?: number | null
+          vale_transporte?: number | null
           valor_fgts?: number | null
         }
         Update: {
+          adiant_premio_pdf?: number | null
+          adiant_premio_planilha?: number | null
+          bancos_esocial?: Json | null
           base_inss?: number | null
           comissao_pdf?: number | null
           comissao_planilha?: number | null
@@ -67,15 +141,22 @@ export type Database = {
           divergencias?: Json | null
           emprestimos_esocial_qtd?: number | null
           emprestimos_pdf?: number | null
+          gratificacao_nps_pdf?: number | null
+          gratificacao_nps_planilha?: number | null
           gratificacao_pdf?: number | null
           gratificacao_planilha?: number | null
           id?: string
           matricula?: string | null
           nome?: string
+          outros_beneficios?: Json | null
+          plano_saude?: number | null
           premio_pdf?: number | null
           premio_planilha?: number | null
+          salario_base?: number | null
           setor?: string | null
           status?: string
+          vale_refeicao?: number | null
+          vale_transporte?: number | null
           valor_fgts?: number | null
         }
         Relationships: [
