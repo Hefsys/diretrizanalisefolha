@@ -261,6 +261,7 @@ function DashboardPage() {
                         <td className="p-2">{cur.matricula ?? "—"}</td>
                         <td className="p-2 text-xs text-muted-foreground">{cur.setor ?? "—"}</td>
                         <td className="p-2 text-center">{cur.emprestimos_esocial_qtd > 0 ? <Badge variant="secondary">{cur.emprestimos_esocial_qtd}</Badge> : "—"}</td>
+                        <td className="p-2 text-right tabular-nums">{Number(cur.emprestimos_pdf) > 0 ? fmtBR(Number(cur.emprestimos_pdf)) : "—"}</td>
                         <td className="p-2 text-right tabular-nums">{fmtBR(comAtual)}</td>
                         <td className="p-2 text-right"><Delta value={dC} money /></td>
                         <td className="p-2 text-right tabular-nums">{fmtBR(grat)}</td>
