@@ -213,7 +213,7 @@ export function conferir(
       return acc;
     },
     {
-      funcionarios: 0, divergentes: 0,
+      funcionarios: 0, divergentes: 0, aLancar: 0,
       comissaoPdf: 0, comissaoPlan: 0,
       gratificacaoPdf: 0, gratificacaoPlan: 0,
       gratificacaoNpsPdf: 0, gratificacaoNpsPlan: 0,
