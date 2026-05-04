@@ -223,6 +223,7 @@ function DashboardPage() {
           <div className="grid md:grid-cols-4 gap-4">
             <Kpi label="Funcionários" value={totais.atual.func} prev={totais.anterior?.func} icon={<Users className="h-4 w-4" />} />
             <Kpi label="Empréstimos (qtd)" value={totais.atual.empQtd} prev={totais.anterior?.empQtd} icon={<Banknote className="h-4 w-4" />} />
+            <Kpi label="Empréstimos (R$)" value={totais.atual.empVal} prev={totais.anterior?.empVal} money icon={<Banknote className="h-4 w-4" />} />
             <Kpi label="Comissão (R$)" value={totais.atual.comissao} prev={totais.anterior?.comissao} money icon={<TrendingUp className="h-4 w-4" />} />
             <Kpi label="Gratificação (R$)" value={totais.atual.gratif} prev={totais.anterior?.gratif} money icon={<Gift className="h-4 w-4" />} />
             <Kpi label="Prêmio (R$)" value={totais.atual.premio} prev={totais.anterior?.premio} money />
@@ -240,7 +241,8 @@ function DashboardPage() {
                     <th className="p-2">Nome</th>
                     <th className="p-2">Mat.</th>
                     <th className="p-2">Setor</th>
-                    <th className="p-2 text-center">Empréstimos</th>
+                    <th className="p-2 text-center">Empréstimos (qtd)</th>
+                    <th className="p-2 text-right">Empréstimos (R$)</th>
                     <th className="p-2 text-right">Comissão</th>
                     <th className="p-2 text-right">Δ Comissão vs ant.</th>
                     <th className="p-2 text-right">Gratificação</th>
@@ -259,6 +261,7 @@ function DashboardPage() {
                         <td className="p-2">{cur.matricula ?? "—"}</td>
                         <td className="p-2 text-xs text-muted-foreground">{cur.setor ?? "—"}</td>
                         <td className="p-2 text-center">{cur.emprestimos_esocial_qtd > 0 ? <Badge variant="secondary">{cur.emprestimos_esocial_qtd}</Badge> : "—"}</td>
+                        <td className="p-2 text-right tabular-nums">{Number(cur.emprestimos_pdf) > 0 ? fmtBR(Number(cur.emprestimos_pdf)) : "—"}</td>
                         <td className="p-2 text-right tabular-nums">{fmtBR(comAtual)}</td>
                         <td className="p-2 text-right"><Delta value={dC} money /></td>
                         <td className="p-2 text-right tabular-nums">{fmtBR(grat)}</td>
