@@ -333,39 +333,40 @@ function DashboardPage() {
         {/* ================== COMISSÕES ================== */}
         <TabsContent value="comissoes" className="space-y-4 mt-4">
           <Card className="p-4">
+            <p className="text-xs text-muted-foreground mb-2">Valores vindos das planilhas dos setores — devem ser lançados na próxima folha.</p>
             <Input placeholder="Buscar…" value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-md mb-3" />
             <div className="overflow-auto border rounded-md">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr className="text-left">
                     <th className="p-2">Nome</th>
+                    <th className="p-2">Setor</th>
                     <th className="p-2 text-right">Comissão 37</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">Gratif. 20</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">NPS 286</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">Prêmio 219</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">Adiant. 241</th>
-                    <th className="p-2 text-right font-bold">Total variável</th>
+                    <th className="p-2 text-right font-bold">Total a lançar</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtrados.map(({ cur, prev }) => {
-                    const total = Number(cur.comissao_pdf) + Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf) + Number(cur.premio_pdf) + Number(cur.adiant_premio_pdf);
+                  {filtrados.map(({ cur }) => {
+                    const com = Number(cur.comissao_planilha) + Number(cur.comissao_pdf);
+                    const g20 = Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf);
+                    const nps = Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf);
+                    const prm = Number(cur.premio_planilha) + Number(cur.premio_pdf);
+                    const adi = Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf);
+                    const total = com + g20 + nps + prm + adi;
+                    if (total === 0) return null;
                     return (
                       <tr key={cur.id} onClick={() => setColSel(cur.id)} className="border-t hover:bg-muted/40 cursor-pointer">
                         <td className="p-2 font-medium">{cur.nome}</td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.comissao_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.comissao_pdf) - Number(prev?.comissao_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.gratificacao_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.gratificacao_pdf) - Number(prev?.gratificacao_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.gratificacao_nps_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.gratificacao_nps_pdf) - Number(prev?.gratificacao_nps_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.premio_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.premio_pdf) - Number(prev?.premio_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.adiant_premio_pdf))}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{cur.setor ?? "—"}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(com)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(g20)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(nps)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(prm)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(adi)}</td>
                         <td className="p-2 text-right tabular-nums font-bold">{fmtBR(total)}</td>
                       </tr>
                     );
