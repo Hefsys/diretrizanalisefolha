@@ -304,7 +304,7 @@ function NovaConferencia() {
   const itensFiltrados = useMemo(() => {
     if (!result) return [];
     return result.itens.filter((i) => {
-      if (filtro === "divergente" && i.status === "ok") return false;
+      if (filtro === "divergente" && i.status !== "divergente") return false;
       if (filtro === "ok" && i.status !== "ok") return false;
       if (busca) {
         const q = busca.toLowerCase();
