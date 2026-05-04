@@ -103,18 +103,22 @@ function NovaConferencia() {
 
   const responderFiliais = async (incluir: boolean) => {
     if (!filialContext) return;
+    // Captura e limpa o contexto IMEDIATAMENTE para evitar dupla execução
+    // (o onOpenChange do AlertDialog dispara junto com o onClick do botão).
+    const ctx = filialContext;
+    setFilialContext(null);
+    setFiliaisPendentes([]);
     setBusy(true);
     try {
-      const { pdfData, todasPlan, cnpjPdf } = filialContext;
+      const { pdfData, todasPlan, cnpjPdf } = ctx;
       const planFinais = incluir
         ? todasPlan
         : todasPlan.filter((p) => !p.cnpj || p.cnpj === cnpjPdf);
       await finalizarConferencia(pdfData, planFinais);
     } catch (err: unknown) {
+      console.error("[responderFiliais]", err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar");
     } finally {
-      setFiliaisPendentes([]);
-      setFilialContext(null);
       setBusy(false);
     }
   };
