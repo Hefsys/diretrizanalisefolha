@@ -19,6 +19,12 @@ export interface ConferenciaItem {
   baseInss: number;
   valorFgts: number;
   emprestimosPdf: number;
+  emprestimosLista: { descricao: string; banco?: string; numeroContrato?: string; parcela: number }[];
+  // Benefícios PDF
+  salarioBase: number;
+  valeTransporte: number;
+  valeRefeicao: number;
+  planoSaude: number;
   // Planilhas
   comissaoPlan: number;
   gratificacaoPlan: number;
