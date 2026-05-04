@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,10 +163,11 @@ function NovaConferencia() {
     }
   };
 
+  const respondendoRef = useRef(false);
   const responderFiliais = async (incluir: boolean) => {
+    if (respondendoRef.current) return;
     if (!filialContext) return;
-    // Captura e limpa o contexto IMEDIATAMENTE para evitar dupla execução
-    // (o onOpenChange do AlertDialog dispara junto com o onClick do botão).
+    respondendoRef.current = true;
     const ctx = filialContext;
     setFilialContext(null);
     setFiliaisPendentes([]);
@@ -183,6 +184,7 @@ function NovaConferencia() {
       toast.error(err instanceof Error ? err.message : "Erro ao processar");
     } finally {
       setBusy(false);
+      respondendoRef.current = false;
     }
   };
 
@@ -476,7 +478,7 @@ function NovaConferencia() {
         </Card>
       )}
 
-      <AlertDialog open={filiaisPendentes.length > 0} onOpenChange={(o) => !o && responderFiliais(false)}>
+      <AlertDialog open={filiaisPendentes.length > 0}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Planilhas de filial detectadas</AlertDialogTitle>
