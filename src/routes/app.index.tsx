@@ -45,18 +45,31 @@ function NovaConferencia() {
 
   const pode = pdfFile && planFiles.length > 0;
 
+  const yieldUI = () => new Promise<void>((r) => setTimeout(r, 0));
+
   const finalizarConferencia = async (
     pdfData: Awaited<ReturnType<typeof parseDominioPdf>>,
     planResults: PlanilhaParseResult[],
   ) => {
-    const esocial = esocialFile ? await parseEsocialXlsx(esocialFile) : [];
-    if (esocialFile) toast.message(`eSocial: ${esocial.length} contratos.`);
+    let esocial: Awaited<ReturnType<typeof parseEsocialXlsx>> = [];
+    if (esocialFile) {
+      toast.message("Lendo eSocial…");
+      console.log("[conferir] iniciando parse eSocial", esocialFile.name, esocialFile.size);
+      await yieldUI();
+      esocial = await parseEsocialXlsx(esocialFile);
+      console.log("[conferir] eSocial parseado:", esocial.length);
+      toast.message(`eSocial: ${esocial.length} contratos.`);
+      await yieldUI();
+    }
+    console.log("[conferir] iniciando merge");
     const r = conferir(pdfData, planResults, esocial);
+    console.log("[conferir] merge concluído:", r.itens.length, "itens");
     if (!empresa && r.empresa) setEmpresa(r.empresa);
     if (!cnpj && r.cnpj) setCnpj(r.cnpj);
     if (!competencia && r.competencia) setCompetencia(r.competencia);
     setResult(r);
     toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
+    return r;
   };
 
   const handleConferir = async () => {
