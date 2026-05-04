@@ -163,12 +163,13 @@ function DashboardPage() {
       func: rows.length,
       empQtd: rows.reduce((a, r) => a + (r.emprestimos_esocial_qtd ?? 0), 0),
       empVal: rows.reduce((a, r) => a + Number(r.emprestimos_pdf ?? 0), 0),
-      comissao: rows.reduce((a, r) => a + Number(r.comissao_pdf ?? 0), 0),
-      gratif: rows.reduce((a, r) => a + Number(r.gratificacao_pdf ?? 0) + Number(r.gratificacao_nps_pdf ?? 0), 0),
-      premio: rows.reduce((a, r) => a + Number(r.premio_pdf ?? 0), 0),
+      comissao: rows.reduce((a, r) => a + Number(r.comissao_pdf ?? 0) + Number(r.comissao_planilha ?? 0), 0),
+      gratif: rows.reduce((a, r) => a + Number(r.gratificacao_pdf ?? 0) + Number(r.gratificacao_nps_pdf ?? 0) + Number(r.gratificacao_planilha ?? 0) + Number(r.gratificacao_nps_planilha ?? 0), 0),
+      premio: rows.reduce((a, r) => a + Number(r.premio_pdf ?? 0) + Number(r.premio_planilha ?? 0) + Number(r.adiant_premio_pdf ?? 0) + Number(r.adiant_premio_planilha ?? 0), 0),
       benef: rows.reduce((a, r) => a + Number(r.vale_transporte ?? 0) + Number(r.vale_refeicao ?? 0) + Number(r.plano_saude ?? 0), 0),
       inss: rows.reduce((a, r) => a + Number(r.base_inss ?? 0), 0),
       fgts: rows.reduce((a, r) => a + Number(r.valor_fgts ?? 0), 0),
+      aLancar: rows.reduce((a, r) => a + Number(r.comissao_planilha ?? 0) + Number(r.gratificacao_planilha ?? 0) + Number(r.gratificacao_nps_planilha ?? 0) + Number(r.premio_planilha ?? 0) + Number(r.adiant_premio_planilha ?? 0), 0),
     });
     return { atual: sumItem(data.itensAtual), anterior: data.itensAnterior.length ? sumItem(data.itensAnterior) : null };
   }, [data]);
