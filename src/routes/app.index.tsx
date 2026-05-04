@@ -548,3 +548,72 @@ function UploadBox({
     </div>
   );
 }
+
+type EtapaIdLocal = "pdf" | "planilhas" | "esocial" | "conferindo" | "salvando" | "redirecionando";
+type EtapaStatusLocal = "pending" | "running" | "done" | "error";
+
+function ProgressoEtapas({
+  etapas,
+  estado,
+}: {
+  etapas: { id: EtapaIdLocal; label: string }[];
+  estado: Record<EtapaIdLocal, { status: EtapaStatusLocal; detalhe?: string }>;
+}) {
+  const concluidas = etapas.filter((e) => estado[e.id].status === "done").length;
+  const total = etapas.length;
+  const pct = Math.round((concluidas / total) * 100);
+  const temErro = etapas.some((e) => estado[e.id].status === "error");
+
+  return (
+    <Card className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold">Progresso da conferência</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {temErro
+              ? "Erro durante o processamento — veja a etapa em vermelho"
+              : concluidas === total
+              ? "Concluído"
+              : `${concluidas} de ${total} etapas concluídas`}
+          </p>
+        </div>
+        <span className="text-2xl font-bold tabular-nums">{pct}%</span>
+      </div>
+      <Progress value={pct} className={temErro ? "[&>div]:bg-destructive" : ""} />
+      <ol className="space-y-2">
+        {etapas.map((e) => {
+          const st = estado[e.id];
+          const icon =
+            st.status === "done" ? (
+              <Check className="h-4 w-4 text-success" />
+            ) : st.status === "running" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : st.status === "error" ? (
+              <X className="h-4 w-4 text-destructive" />
+            ) : (
+              <Circle className="h-4 w-4 text-muted-foreground/40" />
+            );
+          const textColor =
+            st.status === "done"
+              ? "text-foreground"
+              : st.status === "running"
+              ? "text-foreground font-medium"
+              : st.status === "error"
+              ? "text-destructive font-medium"
+              : "text-muted-foreground";
+          return (
+            <li key={e.id} className="flex items-center gap-3 text-sm">
+              <span className="flex-shrink-0">{icon}</span>
+              <span className={textColor}>{e.label}</span>
+              {st.detalhe && (
+                <span className="text-xs text-muted-foreground ml-auto truncate max-w-[50%]" title={st.detalhe}>
+                  {st.detalhe}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
