@@ -482,12 +482,12 @@ function ColaboradorDetalhe({ cur, prev, emprestimos }: { cur: ItemRow; prev: It
         </p>
       </SheetHeader>
       <div className="mt-4 space-y-4">
-        <Section title="Comissões e gratificações">
-          <Linha label="Comissão (37)" value={Number(cur.comissao_pdf)} prev={Number(prev?.comissao_pdf ?? 0)} />
-          <Linha label="Gratificação (20)" value={Number(cur.gratificacao_pdf)} prev={Number(prev?.gratificacao_pdf ?? 0)} />
-          <Linha label="Gratificação NPS (286)" value={Number(cur.gratificacao_nps_pdf)} prev={Number(prev?.gratificacao_nps_pdf ?? 0)} />
-          <Linha label="Prêmio (219)" value={Number(cur.premio_pdf)} prev={Number(prev?.premio_pdf ?? 0)} />
-          <Linha label="Adiant. Prêmio (241)" value={Number(cur.adiant_premio_pdf)} prev={Number(prev?.adiant_premio_pdf ?? 0)} />
+        <Section title="Comissões e gratificações (a lançar)">
+          <Linha label="Comissão (37)" value={Number(cur.comissao_planilha) + Number(cur.comissao_pdf)} prev={Number(prev?.comissao_planilha ?? 0) + Number(prev?.comissao_pdf ?? 0)} />
+          <Linha label="Gratificação (20)" value={Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf)} prev={Number(prev?.gratificacao_planilha ?? 0) + Number(prev?.gratificacao_pdf ?? 0)} />
+          <Linha label="Gratificação NPS (286)" value={Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf)} prev={Number(prev?.gratificacao_nps_planilha ?? 0) + Number(prev?.gratificacao_nps_pdf ?? 0)} />
+          <Linha label="Prêmio (219)" value={Number(cur.premio_planilha) + Number(cur.premio_pdf)} prev={Number(prev?.premio_planilha ?? 0) + Number(prev?.premio_pdf ?? 0)} />
+          <Linha label="Adiant. Prêmio (241)" value={Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf)} prev={Number(prev?.adiant_premio_planilha ?? 0) + Number(prev?.adiant_premio_pdf ?? 0)} />
         </Section>
 
         <Section title="Empréstimos consignados">
