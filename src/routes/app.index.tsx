@@ -14,7 +14,8 @@ import { exportarPdf, exportarExcelDivergencias } from "@/lib/exporters";
 import { fmtBR } from "@/lib/normalize";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { FileText, FileSpreadsheet, Database, Play, Download, FileDown, AlertTriangle, CheckCircle2, X, Info } from "lucide-react";
+import { FileText, FileSpreadsheet, Database, Play, Download, FileDown, AlertTriangle, CheckCircle2, X, Info, Loader2, Check, Circle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { parseFolhaXls as parseFolhaXlsLib, type PlanilhaParseResult } from "@/lib/parseXls";
 
@@ -43,6 +44,36 @@ function NovaConferencia() {
     cnpjPdf: string;
   } | null>(null);
 
+  type EtapaId = "pdf" | "planilhas" | "esocial" | "conferindo" | "salvando" | "redirecionando";
+  type EtapaStatus = "pending" | "running" | "done" | "error";
+  const ETAPAS: { id: EtapaId; label: string }[] = [
+    { id: "pdf", label: "Lendo PDF do Domínio" },
+    { id: "planilhas", label: "Lendo planilhas de comissão" },
+    { id: "esocial", label: "Lendo eSocial" },
+    { id: "conferindo", label: "Conferindo dados" },
+    { id: "salvando", label: "Salvando no banco" },
+    { id: "redirecionando", label: "Abrindo dashboard" },
+  ];
+  const [etapas, setEtapas] = useState<Record<EtapaId, { status: EtapaStatus; detalhe?: string }>>({
+    pdf: { status: "pending" },
+    planilhas: { status: "pending" },
+    esocial: { status: "pending" },
+    conferindo: { status: "pending" },
+    salvando: { status: "pending" },
+    redirecionando: { status: "pending" },
+  });
+  const setEtapa = (id: EtapaId, status: EtapaStatus, detalhe?: string) =>
+    setEtapas((prev) => ({ ...prev, [id]: { status, detalhe } }));
+  const resetEtapas = () =>
+    setEtapas({
+      pdf: { status: "pending" },
+      planilhas: { status: "pending" },
+      esocial: { status: "pending" },
+      conferindo: { status: "pending" },
+      salvando: { status: "pending" },
+      redirecionando: { status: "pending" },
+    });
+
   const pode = pdfFile && planFiles.length > 0;
 
   const yieldUI = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -53,22 +84,31 @@ function NovaConferencia() {
   ) => {
     let esocial: Awaited<ReturnType<typeof parseEsocialXlsx>> = [];
     if (esocialFile) {
-      toast.message("Lendo eSocial…");
+      setEtapa("esocial", "running", `${(esocialFile.size / 1024).toFixed(0)} KB`);
       console.log("[conferir] iniciando parse eSocial", esocialFile.name, esocialFile.size);
       await yieldUI();
-      esocial = await parseEsocialXlsx(esocialFile);
-      console.log("[conferir] eSocial parseado:", esocial.length);
-      toast.message(`eSocial: ${esocial.length} contratos.`);
+      try {
+        esocial = await parseEsocialXlsx(esocialFile);
+        setEtapa("esocial", "done", `${esocial.length} contratos`);
+        console.log("[conferir] eSocial parseado:", esocial.length);
+      } catch (e) {
+        setEtapa("esocial", "error", e instanceof Error ? e.message : "falhou");
+        throw e;
+      }
       await yieldUI();
+    } else {
+      setEtapa("esocial", "done", "não enviado");
     }
+    setEtapa("conferindo", "running");
+    await yieldUI();
     console.log("[conferir] iniciando merge");
     const r = conferir(pdfData, planResults, esocial);
     console.log("[conferir] merge concluído:", r.itens.length, "itens");
+    setEtapa("conferindo", "done", `${r.itens.length} funcionários · ${r.totais.divergentes} divergências`);
     if (!empresa && r.empresa) setEmpresa(r.empresa);
     if (!cnpj && r.cnpj) setCnpj(r.cnpj);
     if (!competencia && r.competencia) setCompetencia(r.competencia);
     setResult(r);
-    toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
     return r;
   };
 
@@ -77,19 +117,27 @@ function NovaConferencia() {
       toast.error("Envie o PDF do Domínio e ao menos uma planilha de comissão.");
       return;
     }
+    resetEtapas();
     setBusy(true);
     try {
-      toast.message("Lendo PDF do Domínio…");
+      setEtapa("pdf", "running", `${(pdfFile.size / 1024).toFixed(0)} KB`);
+      await yieldUI();
       const pdfBuf = await pdfFile.arrayBuffer();
       const pdfData = await parseDominioPdf(pdfBuf);
-      toast.message(`PDF lido: ${pdfData.funcionarios.length} funcionários.`);
+      setEtapa("pdf", "done", `${pdfData.funcionarios.length} funcionários`);
+      await yieldUI();
 
+      setEtapa("planilhas", "running", `0/${planFiles.length}`);
       const planResults: PlanilhaParseResult[] = [];
-      for (const f of planFiles) {
-        const r = await parseFolhaXlsLib(f);
+      for (let i = 0; i < planFiles.length; i++) {
+        setEtapa("planilhas", "running", `${i + 1}/${planFiles.length} · ${planFiles[i].name}`);
+        await yieldUI();
+        const r = await parseFolhaXlsLib(planFiles[i]);
         planResults.push(...r);
       }
-      toast.message(`Planilhas lidas: ${planResults.reduce((a, p) => a + p.funcionarios.length, 0)} linhas.`);
+      const totalLinhas = planResults.reduce((a, p) => a + p.funcionarios.length, 0);
+      setEtapa("planilhas", "done", `${totalLinhas} linhas em ${planResults.length} setores`);
+      await yieldUI();
 
       // Detecta filiais (CNPJ diferente do PDF)
       const cnpjPdf = pdfData.cnpj?.replace(/\D/g, "") ?? "";
@@ -145,7 +193,8 @@ function NovaConferencia() {
     }
     const result = resultToSave;
     try {
-      toast.message("Salvando no banco…");
+      setEtapa("salvando", "running", "criando conferência…");
+      await yieldUI();
       const { data: conf, error } = await supabase
         .from("conferencias")
         .insert({
@@ -198,6 +247,8 @@ function NovaConferencia() {
       // Insert em batches e captura os IDs para vincular empréstimos
       const insertedItens: { id: string; cpf: string | null; matricula: string | null; nome: string }[] = [];
       for (let idx = 0; idx < itens.length; idx += 500) {
+        setEtapa("salvando", "running", `itens ${Math.min(idx + 500, itens.length)}/${itens.length}`);
+        await yieldUI();
         const slice = itens.slice(idx, idx + 500);
         const { data: ins, error: e2 } = await supabase
           .from("conferencia_itens")
@@ -230,15 +281,20 @@ function NovaConferencia() {
       }
       if (empRows.length > 0) {
         for (let idx = 0; idx < empRows.length; idx += 500) {
+          setEtapa("salvando", "running", `empréstimos ${Math.min(idx + 500, empRows.length)}/${empRows.length}`);
+          await yieldUI();
           const slice = empRows.slice(idx, idx + 500);
           const { error: e3 } = await supabase.from("conferencia_emprestimos").insert(slice);
           if (e3) throw e3;
         }
       }
 
-      toast.success("Conferência salva — abrindo dashboard.");
+      setEtapa("salvando", "done", `${itens.length} itens · ${empRows.length} empréstimos`);
+      setEtapa("redirecionando", "running");
+      await yieldUI();
       navigate({ to: "/app/dashboard/$id", params: { id: conf.id } });
     } catch (err: unknown) {
+      setEtapa("salvando", "error", err instanceof Error ? err.message : "erro");
       toast.error(err instanceof Error ? err.message : "Erro ao salvar");
     }
   };
@@ -317,6 +373,10 @@ function NovaConferencia() {
           </Button>
         </div>
       </Card>
+
+      {(busy || Object.values(etapas).some((e) => e.status !== "pending")) && (
+        <ProgressoEtapas etapas={ETAPAS} estado={etapas} />
+      )}
 
       {result && (
         <Card className="p-6 space-y-5">
@@ -486,5 +546,74 @@ function UploadBox({
         </ul>
       )}
     </div>
+  );
+}
+
+type EtapaIdLocal = "pdf" | "planilhas" | "esocial" | "conferindo" | "salvando" | "redirecionando";
+type EtapaStatusLocal = "pending" | "running" | "done" | "error";
+
+function ProgressoEtapas({
+  etapas,
+  estado,
+}: {
+  etapas: { id: EtapaIdLocal; label: string }[];
+  estado: Record<EtapaIdLocal, { status: EtapaStatusLocal; detalhe?: string }>;
+}) {
+  const concluidas = etapas.filter((e) => estado[e.id].status === "done").length;
+  const total = etapas.length;
+  const pct = Math.round((concluidas / total) * 100);
+  const temErro = etapas.some((e) => estado[e.id].status === "error");
+
+  return (
+    <Card className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold">Progresso da conferência</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {temErro
+              ? "Erro durante o processamento — veja a etapa em vermelho"
+              : concluidas === total
+              ? "Concluído"
+              : `${concluidas} de ${total} etapas concluídas`}
+          </p>
+        </div>
+        <span className="text-2xl font-bold tabular-nums">{pct}%</span>
+      </div>
+      <Progress value={pct} className={temErro ? "[&>div]:bg-destructive" : ""} />
+      <ol className="space-y-2">
+        {etapas.map((e) => {
+          const st = estado[e.id];
+          const icon =
+            st.status === "done" ? (
+              <Check className="h-4 w-4 text-success" />
+            ) : st.status === "running" ? (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            ) : st.status === "error" ? (
+              <X className="h-4 w-4 text-destructive" />
+            ) : (
+              <Circle className="h-4 w-4 text-muted-foreground/40" />
+            );
+          const textColor =
+            st.status === "done"
+              ? "text-foreground"
+              : st.status === "running"
+              ? "text-foreground font-medium"
+              : st.status === "error"
+              ? "text-destructive font-medium"
+              : "text-muted-foreground";
+          return (
+            <li key={e.id} className="flex items-center gap-3 text-sm">
+              <span className="flex-shrink-0">{icon}</span>
+              <span className={textColor}>{e.label}</span>
+              {st.detalhe && (
+                <span className="text-xs text-muted-foreground ml-auto truncate max-w-[50%]" title={st.detalhe}>
+                  {st.detalhe}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
   );
 }
