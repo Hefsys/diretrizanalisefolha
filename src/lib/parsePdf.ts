@@ -95,17 +95,30 @@ function parseEmpregadoHeader(line: string): { matricula: string; nome: string; 
 }
 
 // Extrai eventos da linha (proventos à esquerda + descontos à direita)
-// Estratégia: pegar todos os números BR em ordem, e procurar códigos no início e meio.
-// Para verbas-alvo (37, 20, 219, 241, 286, 998 INSS é descontos): tomamos o ÚLTIMO valor da seção (=valor da parcela).
-function tryExtractValueByCode(line: string, codes: string[]): number {
-  // Procura "<cod><DESC...>" ou "<cod> <DESC...>" no início, depois pega último valor antes do "P" da seção
-  // Regra simples e robusta: ' <COD>NOME ... NUMERO P'  (provento) — se encontrar.
+// Estratégia: localizar a verba pelo código + descrição alfabética, capturar o
+// "segmento" da verba (até o próximo código de verba ou o fim do bloco) e dentro
+// dele pegar o ÚLTIMO valor seguido de "P" — que corresponde ao valor lançado
+// (ignorando colunas de Referência / Vl. Unitário que aparecem antes).
+function tryExtractValueByCode(block: string, codes: string[]): number {
   let total = 0;
   for (const c of codes) {
-    // Busca por padrão "(cod)<algumacoisa> NUMERO P" — proventos
-    const re = new RegExp(`(?:^|\\s)${c}([A-ZÀ-Úa-zà-ú\\.\\/\\-0-9 ]*?)\\s+(\\d{1,3}(?:\\.\\d{3})*,\\d{2})\\s*P\\b`);
-    const m = line.match(re);
-    if (m) total += parseBR(m[2]);
+    // Anchor: código + (espaço opcional) + letra (descrição). Evita casar
+    // com números soltos (ex.: "120" não bate com código "20").
+    const startRe = new RegExp(`(?:^|\\s)${c}\\s*(?=[A-ZÀ-Úa-zà-ú])`, "g");
+    let m: RegExpExecArray | null;
+    while ((m = startRe.exec(block)) !== null) {
+      const startIdx = m.index + m[0].length;
+      // Segmento: do início da descrição até o próximo código de verba
+      // (padrão: espaço + 1-4 dígitos + espaço + letra) ou fim do bloco.
+      const rest = block.slice(startIdx);
+      const nextCodeMatch = rest.match(/\s\d{1,4}\s*(?=[A-ZÀ-Úa-zà-ú])/);
+      const segment = nextCodeMatch ? rest.slice(0, nextCodeMatch.index) : rest;
+      // Dentro do segmento, pega o último valor seguido de P (provento).
+      const valMatches = [...segment.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*P\b/g)];
+      if (valMatches.length > 0) {
+        total += parseBR(valMatches[valMatches.length - 1][1]);
+      }
+    }
   }
   return total;
 }
