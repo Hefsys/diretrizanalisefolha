@@ -249,21 +249,25 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {filtrados.map(({ cur, prev }) => {
-                    const dC = Number(cur.comissao_pdf) - Number(prev?.comissao_pdf ?? 0);
-                    const grat = Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf);
+                    const comAtual = Number(cur.comissao_pdf) + Number(cur.comissao_planilha);
+                    const comPrev = Number(prev?.comissao_pdf ?? 0) + Number(prev?.comissao_planilha ?? 0);
+                    const dC = comAtual - comPrev;
+                    const grat = Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf) + Number(cur.gratificacao_planilha) + Number(cur.gratificacao_nps_planilha);
                     return (
                       <tr key={cur.id} onClick={() => setColSel(cur.id)} className="border-t hover:bg-muted/40 cursor-pointer">
                         <td className="p-2 font-medium">{cur.nome}</td>
                         <td className="p-2">{cur.matricula ?? "—"}</td>
                         <td className="p-2 text-xs text-muted-foreground">{cur.setor ?? "—"}</td>
                         <td className="p-2 text-center">{cur.emprestimos_esocial_qtd > 0 ? <Badge variant="secondary">{cur.emprestimos_esocial_qtd}</Badge> : "—"}</td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.comissao_pdf))}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(comAtual)}</td>
                         <td className="p-2 text-right"><Delta value={dC} money /></td>
                         <td className="p-2 text-right tabular-nums">{fmtBR(grat)}</td>
                         <td className="p-2 text-center">
                           {cur.status === "ok"
                             ? <CheckCircle2 className="h-4 w-4 text-success inline" />
-                            : <AlertTriangle className="h-4 w-4 text-destructive inline" />}
+                            : cur.status === "so_planilha"
+                              ? <Badge variant="outline" className="border-blue-500/40 text-blue-600 bg-blue-500/5 text-xs">A lançar</Badge>
+                              : <AlertTriangle className="h-4 w-4 text-destructive inline" />}
                         </td>
                       </tr>
                     );
