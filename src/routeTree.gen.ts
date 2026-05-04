@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppHistoricoRouteImport } from './routes/app.historico'
+import { Route as AppDashboardIdRouteImport } from './routes/app.dashboard.$id'
 
 const AppRoute = AppRouteImport.update({
   id: '/app',
@@ -34,17 +35,24 @@ const AppHistoricoRoute = AppHistoricoRouteImport.update({
   path: '/historico',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDashboardIdRoute = AppDashboardIdRouteImport.update({
+  id: '/dashboard/$id',
+  path: '/dashboard/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/app/historico': typeof AppHistoricoRoute
   '/app/': typeof AppIndexRoute
+  '/app/dashboard/$id': typeof AppDashboardIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app/historico': typeof AppHistoricoRoute
   '/app': typeof AppIndexRoute
+  '/app/dashboard/$id': typeof AppDashboardIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -52,13 +60,20 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/app/historico': typeof AppHistoricoRoute
   '/app/': typeof AppIndexRoute
+  '/app/dashboard/$id': typeof AppDashboardIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/app/historico' | '/app/'
+  fullPaths: '/' | '/app' | '/app/historico' | '/app/' | '/app/dashboard/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app/historico' | '/app'
-  id: '__root__' | '/' | '/app' | '/app/historico' | '/app/'
+  to: '/' | '/app/historico' | '/app' | '/app/dashboard/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/app/historico'
+    | '/app/'
+    | '/app/dashboard/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -96,17 +111,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHistoricoRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/dashboard/$id': {
+      id: '/app/dashboard/$id'
+      path: '/dashboard/$id'
+      fullPath: '/app/dashboard/$id'
+      preLoaderRoute: typeof AppDashboardIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppHistoricoRoute: typeof AppHistoricoRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppDashboardIdRoute: typeof AppDashboardIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppHistoricoRoute: AppHistoricoRoute,
   AppIndexRoute: AppIndexRoute,
+  AppDashboardIdRoute: AppDashboardIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -86,7 +86,10 @@ function Historico() {
                   <p>{c.total_funcionarios} funcionários</p>
                   <p className="text-muted-foreground">Comissão PDF R$ {fmtBR(Number(c.total_comissao_pdf))} · Planilha R$ {fmtBR(Number(c.total_comissao_planilha))}</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => remove(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex gap-2">
+                  <Button asChild size="sm"><Link to="/app/dashboard/$id" params={{ id: c.id }}>Abrir dashboard</Link></Button>
+                  <Button variant="ghost" size="icon" onClick={() => remove(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
               </div>
             </Card>
           ))}

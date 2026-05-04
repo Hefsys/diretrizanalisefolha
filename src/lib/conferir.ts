@@ -19,6 +19,12 @@ export interface ConferenciaItem {
   baseInss: number;
   valorFgts: number;
   emprestimosPdf: number;
+  emprestimosLista: { descricao: string; banco?: string; numeroContrato?: string; parcela: number }[];
+  // Benefícios PDF
+  salarioBase: number;
+  valeTransporte: number;
+  valeRefeicao: number;
+  planoSaude: number;
   // Planilhas
   comissaoPlan: number;
   gratificacaoPlan: number;
@@ -112,6 +118,11 @@ export function conferir(
       baseInss: f.baseInss,
       valorFgts: f.valorFgts,
       emprestimosPdf: f.emprestimos,
+      emprestimosLista: (f as any).emprestimosLista ?? [],
+      salarioBase: (f as any).salarioBase ?? 0,
+      valeTransporte: (f as any).valeTransporte ?? 0,
+      valeRefeicao: (f as any).valeRefeicao ?? 0,
+      planoSaude: (f as any).planoSaude ?? 0,
       comissaoPlan: planEntry?.comissao ?? 0,
       gratificacaoPlan: planEntry?.gratificacao ?? 0,
       gratificacaoNpsPlan: planEntry?.gratificacaoNps ?? 0,
@@ -180,7 +191,8 @@ export function conferir(
         setor: p.setor,
         arquivoPlan: p.arquivo,
         comissaoPdf: 0, gratificacaoPdf: 0, gratificacaoNpsPdf: 0, premioPdf: 0, adiantPremioPdf: 0,
-        baseInss: 0, valorFgts: 0, emprestimosPdf: 0,
+        baseInss: 0, valorFgts: 0, emprestimosPdf: 0, emprestimosLista: [],
+        salarioBase: 0, valeTransporte: 0, valeRefeicao: 0, planoSaude: 0,
         comissaoPlan: f.comissao,
         gratificacaoPlan: f.gratificacao,
         gratificacaoNpsPlan: f.gratificacaoNps,

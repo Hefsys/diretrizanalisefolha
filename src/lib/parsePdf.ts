@@ -5,6 +5,13 @@ import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc as string;
 
+export interface EmprestimoPdf {
+  descricao: string;
+  banco?: string;
+  numeroContrato?: string;
+  parcela: number;
+}
+
 export interface PdfFuncionario {
   matricula: string;
   nome: string;
@@ -15,10 +22,16 @@ export interface PdfFuncionario {
   gratificacaoNps: number; // verba 286 (NPS)
   premio: number;          // verba 219
   adiantPremio: number;    // verba 241
+  salarioBase: number;     // verba 1 (SALARIO)
+  valeTransporte: number;  // VT
+  valeRefeicao: number;    // VR/VA
+  planoSaude: number;      // plano de saúde
+  outrosBeneficios: { descricao: string; valor: number }[];
   baseInss: number;
   valorFgts: number;
   emprestimos: number;    // soma de "DESC. EMP. CRED. TRAB" descontos
   emprestimosCount: number;
+  emprestimosLista: EmprestimoPdf[];
   proventos: number;
   descontos: number;
   liquido: number;
@@ -152,10 +165,42 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
     current.gratificacaoNps = tryExtractValueByCode(block, COD_GRATIF_NPS);
     current.premio = tryExtractValueByCode(block, COD_PREMIO);
     current.adiantPremio = tryExtractValueByCode(block, COD_ADIANT_PREMIO);
+    // Salário-base (verba 1)
+    current.salarioBase = tryExtractValueByCode(block, ["1"]);
+    // Benefícios — busca por palavras-chave em descontos (D) e proventos (P)
+    const findByKeywords = (kws: RegExp): number => {
+      let total = 0;
+      for (const ln of aggregateLines) {
+        if (kws.test(ln)) {
+          const nums = [...ln.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+          if (nums.length > 0) total += parseBR(nums[nums.length - 1][1]);
+        }
+      }
+      return total;
+    };
+    current.valeTransporte = findByKeywords(/VALE\s*TRANSP|\bVT\b/i);
+    current.valeRefeicao = findByKeywords(/VALE\s*(REFEI|ALIMENT)|\bVR\b|\bVA\b/i);
+    current.planoSaude = findByKeywords(/PLANO\s*SA[ÚU]DE|ASSIST[ÊE]NCIA\s*M[ÉE]DICA|UNIMED|AMIL/i);
+
     // Empréstimos descontados (linhas com "DESC. EMP. CRED. TRAB" + NUM D)
     const empMatches = [...block.matchAll(/DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB[^\n]*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*D\b/g)];
     current.emprestimos = empMatches.reduce((a, m) => a + parseBR(m[1]), 0);
     current.emprestimosCount = empMatches.length;
+    // Lista detalhada — uma entrada por linha encontrada
+    current.emprestimosLista = aggregateLines
+      .filter((ln) => /DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB/i.test(ln))
+      .map((ln) => {
+        const nums = [...ln.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+        const parcela = nums.length > 0 ? parseBR(nums[nums.length - 1][1]) : 0;
+        const bancoMatch = ln.match(/(BANCO\s+[A-Z\s]+|BMG|ITAU|ITA[ÚU]|BRADESCO|SANTANDER|CAIXA|BB|BANRISUL|PAN|SAFRA|DAYCOVAL|FACTA|OLE|MERCANTIL)/i);
+        const contratoMatch = ln.match(/(\d{6,})/);
+        return {
+          descricao: ln.replace(/\s+/g, " ").slice(0, 120),
+          banco: bancoMatch?.[1]?.trim(),
+          numeroContrato: contratoMatch?.[1],
+          parcela,
+        };
+      });
     funcionarios.push(current);
     current = null;
     aggregateLines = [];
@@ -171,7 +216,8 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
         cpf: head.cpf,
         situacao: head.situacao,
         comissao: 0, gratificacao: 0, gratificacaoNps: 0, premio: 0, adiantPremio: 0,
-        baseInss: 0, valorFgts: 0, emprestimos: 0, emprestimosCount: 0,
+        salarioBase: 0, valeTransporte: 0, valeRefeicao: 0, planoSaude: 0, outrosBeneficios: [],
+        baseInss: 0, valorFgts: 0, emprestimos: 0, emprestimosCount: 0, emprestimosLista: [],
         proventos: 0, descontos: 0, liquido: 0,
       };
       aggregateLines.push(line);
