@@ -24,6 +24,7 @@ export const Route = createFileRoute("/app/")({
 
 function NovaConferencia() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [planFiles, setPlanFiles] = useState<File[]>([]);
   const [esocialFile, setEsocialFile] = useState<File | null>(null);
