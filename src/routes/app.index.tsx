@@ -104,7 +104,7 @@ function NovaConferencia() {
     console.log("[conferir] iniciando merge");
     const r = conferir(pdfData, planResults, esocial);
     console.log("[conferir] merge concluído:", r.itens.length, "itens");
-    setEtapa("conferindo", "done", `${r.itens.length} funcionários · ${r.totais.divergentes} divergências`);
+    setEtapa("conferindo", "done", `${r.itens.length} funcionários · ${r.totais.divergentes} divergências · ${r.totais.aLancar} a lançar`);
     if (!empresa && r.empresa) setEmpresa(r.empresa);
     if (!cnpj && r.cnpj) setCnpj(r.cnpj);
     if (!competencia && r.competencia) setCompetencia(r.competencia);
@@ -304,7 +304,7 @@ function NovaConferencia() {
   const itensFiltrados = useMemo(() => {
     if (!result) return [];
     return result.itens.filter((i) => {
-      if (filtro === "divergente" && i.status === "ok") return false;
+      if (filtro === "divergente" && i.status !== "divergente") return false;
       if (filtro === "ok" && i.status !== "ok") return false;
       if (busca) {
         const q = busca.toLowerCase();
@@ -395,8 +395,8 @@ function NovaConferencia() {
           <div className="grid md:grid-cols-4 gap-4">
             <Stat label="Funcionários" value={String(result.totais.funcionarios)} />
             <Stat label="Divergências" value={String(result.totais.divergentes)} variant={result.totais.divergentes > 0 ? "warn" : "ok"} />
-            <Stat label="Δ Comissão (PDF − Planilha)" value={`R$ ${fmtBR(result.totais.comissaoPdf - result.totais.comissaoPlan)}`} />
-            <Stat label="Δ Gratificação (PDF − Planilha)" value={`R$ ${fmtBR(result.totais.gratificacaoPdf - result.totais.gratificacaoPlan)}`} />
+            <Stat label="A lançar (só planilha)" value={String(result.totais.aLancar)} />
+            <Stat label="Total Comissão Planilha" value={`R$ ${fmtBR(result.totais.comissaoPlan)}`} />
           </div>
 
           <div className="flex flex-wrap gap-3 items-end justify-between">
@@ -404,7 +404,7 @@ function NovaConferencia() {
               <TabsList>
                 <TabsTrigger value="todos">Todos ({result.itens.length})</TabsTrigger>
                 <TabsTrigger value="divergente">Divergentes ({result.totais.divergentes})</TabsTrigger>
-                <TabsTrigger value="ok">OK ({result.itens.length - result.totais.divergentes})</TabsTrigger>
+                <TabsTrigger value="ok">OK ({result.itens.filter(i => i.status === "ok").length})</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="flex gap-2 flex-1 max-w-md">
@@ -449,7 +449,9 @@ function NovaConferencia() {
                       <td className="p-2">
                         {i.status === "ok"
                           ? <Badge variant="outline" className="border-success/40 text-success bg-success/5"><CheckCircle2 className="h-3 w-3 mr-1" />OK</Badge>
-                          : <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/5"><AlertTriangle className="h-3 w-3 mr-1" />{i.status === "divergente" ? "Divergente" : i.status === "so_pdf" ? "Só no PDF" : "Só na planilha"}</Badge>}
+                          : i.status === "so_planilha"
+                            ? <Badge variant="outline" className="border-blue-500/40 text-blue-600 bg-blue-500/5">A lançar</Badge>
+                            : <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/5"><AlertTriangle className="h-3 w-3 mr-1" />{i.status === "divergente" ? "Divergente" : "Só no PDF"}</Badge>}
                       </td>
                       <td className="p-2">{i.matricula || "—"}</td>
                       <td className="p-2 font-medium">{i.nome}</td>

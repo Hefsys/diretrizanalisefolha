@@ -26,6 +26,11 @@ interface ItemRow {
   gratificacao_nps_pdf: number;
   premio_pdf: number;
   adiant_premio_pdf: number;
+  comissao_planilha: number;
+  gratificacao_planilha: number;
+  gratificacao_nps_planilha: number;
+  premio_planilha: number;
+  adiant_premio_planilha: number;
   salario_base: number;
   vale_transporte: number;
   vale_refeicao: number;
@@ -158,12 +163,13 @@ function DashboardPage() {
       func: rows.length,
       empQtd: rows.reduce((a, r) => a + (r.emprestimos_esocial_qtd ?? 0), 0),
       empVal: rows.reduce((a, r) => a + Number(r.emprestimos_pdf ?? 0), 0),
-      comissao: rows.reduce((a, r) => a + Number(r.comissao_pdf ?? 0), 0),
-      gratif: rows.reduce((a, r) => a + Number(r.gratificacao_pdf ?? 0) + Number(r.gratificacao_nps_pdf ?? 0), 0),
-      premio: rows.reduce((a, r) => a + Number(r.premio_pdf ?? 0), 0),
+      comissao: rows.reduce((a, r) => a + Number(r.comissao_pdf ?? 0) + Number(r.comissao_planilha ?? 0), 0),
+      gratif: rows.reduce((a, r) => a + Number(r.gratificacao_pdf ?? 0) + Number(r.gratificacao_nps_pdf ?? 0) + Number(r.gratificacao_planilha ?? 0) + Number(r.gratificacao_nps_planilha ?? 0), 0),
+      premio: rows.reduce((a, r) => a + Number(r.premio_pdf ?? 0) + Number(r.premio_planilha ?? 0) + Number(r.adiant_premio_pdf ?? 0) + Number(r.adiant_premio_planilha ?? 0), 0),
       benef: rows.reduce((a, r) => a + Number(r.vale_transporte ?? 0) + Number(r.vale_refeicao ?? 0) + Number(r.plano_saude ?? 0), 0),
       inss: rows.reduce((a, r) => a + Number(r.base_inss ?? 0), 0),
       fgts: rows.reduce((a, r) => a + Number(r.valor_fgts ?? 0), 0),
+      aLancar: rows.reduce((a, r) => a + Number(r.comissao_planilha ?? 0) + Number(r.gratificacao_planilha ?? 0) + Number(r.gratificacao_nps_planilha ?? 0) + Number(r.premio_planilha ?? 0) + Number(r.adiant_premio_planilha ?? 0), 0),
     });
     return { atual: sumItem(data.itensAtual), anterior: data.itensAnterior.length ? sumItem(data.itensAnterior) : null };
   }, [data]);
@@ -203,8 +209,9 @@ function DashboardPage() {
       </header>
 
       <Tabs value={aba} onValueChange={setAba}>
-        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-4xl">
           <TabsTrigger value="geral">Visão Geral</TabsTrigger>
+          <TabsTrigger value="alancar">A Lançar</TabsTrigger>
           <TabsTrigger value="emprestimos">Empréstimos</TabsTrigger>
           <TabsTrigger value="comissoes">Comissões</TabsTrigger>
           <TabsTrigger value="beneficios">Benefícios</TabsTrigger>
@@ -242,21 +249,25 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {filtrados.map(({ cur, prev }) => {
-                    const dC = Number(cur.comissao_pdf) - Number(prev?.comissao_pdf ?? 0);
-                    const grat = Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf);
+                    const comAtual = Number(cur.comissao_pdf) + Number(cur.comissao_planilha);
+                    const comPrev = Number(prev?.comissao_pdf ?? 0) + Number(prev?.comissao_planilha ?? 0);
+                    const dC = comAtual - comPrev;
+                    const grat = Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf) + Number(cur.gratificacao_planilha) + Number(cur.gratificacao_nps_planilha);
                     return (
                       <tr key={cur.id} onClick={() => setColSel(cur.id)} className="border-t hover:bg-muted/40 cursor-pointer">
                         <td className="p-2 font-medium">{cur.nome}</td>
                         <td className="p-2">{cur.matricula ?? "—"}</td>
                         <td className="p-2 text-xs text-muted-foreground">{cur.setor ?? "—"}</td>
                         <td className="p-2 text-center">{cur.emprestimos_esocial_qtd > 0 ? <Badge variant="secondary">{cur.emprestimos_esocial_qtd}</Badge> : "—"}</td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.comissao_pdf))}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(comAtual)}</td>
                         <td className="p-2 text-right"><Delta value={dC} money /></td>
                         <td className="p-2 text-right tabular-nums">{fmtBR(grat)}</td>
                         <td className="p-2 text-center">
                           {cur.status === "ok"
                             ? <CheckCircle2 className="h-4 w-4 text-success inline" />
-                            : <AlertTriangle className="h-4 w-4 text-destructive inline" />}
+                            : cur.status === "so_planilha"
+                              ? <Badge variant="outline" className="border-blue-500/40 text-blue-600 bg-blue-500/5 text-xs">A lançar</Badge>
+                              : <AlertTriangle className="h-4 w-4 text-destructive inline" />}
                         </td>
                       </tr>
                     );
@@ -265,6 +276,11 @@ function DashboardPage() {
               </table>
             </div>
           </Card>
+        </TabsContent>
+
+        {/* ================== A LANÇAR ================== */}
+        <TabsContent value="alancar" className="space-y-4 mt-4">
+          <ALancarTab itens={data.itensAtual} competencia={data.atual.competencia} empresa={data.atual.empresa ?? ""} />
         </TabsContent>
 
         {/* ================== EMPRÉSTIMOS ================== */}
@@ -317,39 +333,40 @@ function DashboardPage() {
         {/* ================== COMISSÕES ================== */}
         <TabsContent value="comissoes" className="space-y-4 mt-4">
           <Card className="p-4">
+            <p className="text-xs text-muted-foreground mb-2">Valores vindos das planilhas dos setores — devem ser lançados na próxima folha.</p>
             <Input placeholder="Buscar…" value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-md mb-3" />
             <div className="overflow-auto border rounded-md">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr className="text-left">
                     <th className="p-2">Nome</th>
+                    <th className="p-2">Setor</th>
                     <th className="p-2 text-right">Comissão 37</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">Gratif. 20</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">NPS 286</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">Prêmio 219</th>
-                    <th className="p-2 text-right">Δ</th>
                     <th className="p-2 text-right">Adiant. 241</th>
-                    <th className="p-2 text-right font-bold">Total variável</th>
+                    <th className="p-2 text-right font-bold">Total a lançar</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtrados.map(({ cur, prev }) => {
-                    const total = Number(cur.comissao_pdf) + Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf) + Number(cur.premio_pdf) + Number(cur.adiant_premio_pdf);
+                  {filtrados.map(({ cur }) => {
+                    const com = Number(cur.comissao_planilha) + Number(cur.comissao_pdf);
+                    const g20 = Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf);
+                    const nps = Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf);
+                    const prm = Number(cur.premio_planilha) + Number(cur.premio_pdf);
+                    const adi = Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf);
+                    const total = com + g20 + nps + prm + adi;
+                    if (total === 0) return null;
                     return (
                       <tr key={cur.id} onClick={() => setColSel(cur.id)} className="border-t hover:bg-muted/40 cursor-pointer">
                         <td className="p-2 font-medium">{cur.nome}</td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.comissao_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.comissao_pdf) - Number(prev?.comissao_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.gratificacao_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.gratificacao_pdf) - Number(prev?.gratificacao_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.gratificacao_nps_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.gratificacao_nps_pdf) - Number(prev?.gratificacao_nps_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.premio_pdf))}</td>
-                        <td className="p-2 text-right"><Delta value={Number(cur.premio_pdf) - Number(prev?.premio_pdf ?? 0)} money /></td>
-                        <td className="p-2 text-right tabular-nums">{fmtBR(Number(cur.adiant_premio_pdf))}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{cur.setor ?? "—"}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(com)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(g20)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(nps)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(prm)}</td>
+                        <td className="p-2 text-right tabular-nums">{fmtBR(adi)}</td>
                         <td className="p-2 text-right tabular-nums font-bold">{fmtBR(total)}</td>
                       </tr>
                     );
@@ -465,12 +482,12 @@ function ColaboradorDetalhe({ cur, prev, emprestimos }: { cur: ItemRow; prev: It
         </p>
       </SheetHeader>
       <div className="mt-4 space-y-4">
-        <Section title="Comissões e gratificações">
-          <Linha label="Comissão (37)" value={Number(cur.comissao_pdf)} prev={Number(prev?.comissao_pdf ?? 0)} />
-          <Linha label="Gratificação (20)" value={Number(cur.gratificacao_pdf)} prev={Number(prev?.gratificacao_pdf ?? 0)} />
-          <Linha label="Gratificação NPS (286)" value={Number(cur.gratificacao_nps_pdf)} prev={Number(prev?.gratificacao_nps_pdf ?? 0)} />
-          <Linha label="Prêmio (219)" value={Number(cur.premio_pdf)} prev={Number(prev?.premio_pdf ?? 0)} />
-          <Linha label="Adiant. Prêmio (241)" value={Number(cur.adiant_premio_pdf)} prev={Number(prev?.adiant_premio_pdf ?? 0)} />
+        <Section title="Comissões e gratificações (a lançar)">
+          <Linha label="Comissão (37)" value={Number(cur.comissao_planilha) + Number(cur.comissao_pdf)} prev={Number(prev?.comissao_planilha ?? 0) + Number(prev?.comissao_pdf ?? 0)} />
+          <Linha label="Gratificação (20)" value={Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf)} prev={Number(prev?.gratificacao_planilha ?? 0) + Number(prev?.gratificacao_pdf ?? 0)} />
+          <Linha label="Gratificação NPS (286)" value={Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf)} prev={Number(prev?.gratificacao_nps_planilha ?? 0) + Number(prev?.gratificacao_nps_pdf ?? 0)} />
+          <Linha label="Prêmio (219)" value={Number(cur.premio_planilha) + Number(cur.premio_pdf)} prev={Number(prev?.premio_planilha ?? 0) + Number(prev?.premio_pdf ?? 0)} />
+          <Linha label="Adiant. Prêmio (241)" value={Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf)} prev={Number(prev?.adiant_premio_planilha ?? 0) + Number(prev?.adiant_premio_pdf ?? 0)} />
         </Section>
 
         <Section title="Empréstimos consignados">
@@ -577,4 +594,106 @@ function competenciaAnterior(comp: string): string | null {
     return `${yy}-${String(mm).padStart(2, "0")}`;
   }
   return null;
+}
+
+function ALancarTab({ itens, competencia, empresa }: { itens: ItemRow[]; competencia: string; empresa: string }) {
+  const linhas = itens
+    .map((i) => {
+      const com = Number(i.comissao_planilha) + Number(i.comissao_pdf);
+      const g20 = Number(i.gratificacao_planilha) + Number(i.gratificacao_pdf);
+      const nps = Number(i.gratificacao_nps_planilha) + Number(i.gratificacao_nps_pdf);
+      const prm = Number(i.premio_planilha) + Number(i.premio_pdf);
+      const adi = Number(i.adiant_premio_planilha) + Number(i.adiant_premio_pdf);
+      const total = com + g20 + nps + prm + adi;
+      return { i, com, g20, nps, prm, adi, total };
+    })
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const totGeral = linhas.reduce(
+    (acc, r) => ({
+      com: acc.com + r.com, g20: acc.g20 + r.g20, nps: acc.nps + r.nps,
+      prm: acc.prm + r.prm, adi: acc.adi + r.adi, total: acc.total + r.total,
+    }),
+    { com: 0, g20: 0, nps: 0, prm: 0, adi: 0, total: 0 }
+  );
+
+  const exportar = () => {
+    const header = ["Matrícula", "CPF", "Nome", "Setor", "Comissão (37)", "Gratif. 20", "NPS 286", "Prêmio 219", "Adiant. 241", "Total a lançar"];
+    const rows = linhas.map((r) => [
+      r.i.matricula ?? "", r.i.cpf ?? "", r.i.nome, r.i.setor ?? "",
+      r.com.toFixed(2), r.g20.toFixed(2), r.nps.toFixed(2), r.prm.toFixed(2), r.adi.toFixed(2), r.total.toFixed(2),
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `a-lancar-${empresa.replace(/\W+/g, "_")}-${competencia.replace(/\W+/g, "")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card className="p-4 space-y-4">
+      <div className="flex items-end justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">Valores a lançar na folha</h2>
+          <p className="text-xs text-muted-foreground">
+            {linhas.length} colaboradores · Total: <strong className="text-foreground">R$ {fmtBR(totGeral.total)}</strong>
+          </p>
+        </div>
+        <button onClick={exportar} className="text-sm px-3 py-1.5 rounded-md border hover:bg-muted">Exportar CSV</button>
+      </div>
+
+      <div className="overflow-auto border rounded-md">
+        <table className="w-full text-sm">
+          <thead className="bg-muted">
+            <tr className="text-left">
+              <th className="p-2">Mat.</th>
+              <th className="p-2">Nome</th>
+              <th className="p-2">Setor</th>
+              <th className="p-2 text-right">Comissão 37</th>
+              <th className="p-2 text-right">Gratif. 20</th>
+              <th className="p-2 text-right">NPS 286</th>
+              <th className="p-2 text-right">Prêmio 219</th>
+              <th className="p-2 text-right">Adiant. 241</th>
+              <th className="p-2 text-right font-bold">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((r) => (
+              <tr key={r.i.id} className="border-t hover:bg-muted/40">
+                <td className="p-2">{r.i.matricula ?? "—"}</td>
+                <td className="p-2 font-medium">{r.i.nome}</td>
+                <td className="p-2 text-xs text-muted-foreground">{r.i.setor ?? "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.com > 0 ? fmtBR(r.com) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.g20 > 0 ? fmtBR(r.g20) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.nps > 0 ? fmtBR(r.nps) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.prm > 0 ? fmtBR(r.prm) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.adi > 0 ? fmtBR(r.adi) : "—"}</td>
+                <td className="p-2 text-right tabular-nums font-bold">{fmtBR(r.total)}</td>
+              </tr>
+            ))}
+            {linhas.length === 0 && (
+              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Nenhum valor a lançar nesta competência.</td></tr>
+            )}
+          </tbody>
+          {linhas.length > 0 && (
+            <tfoot className="bg-muted/60 font-semibold">
+              <tr>
+                <td className="p-2" colSpan={3}>Total geral</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.com)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.g20)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.nps)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.prm)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.adi)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.total)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </Card>
+  );
 }

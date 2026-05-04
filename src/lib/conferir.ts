@@ -55,6 +55,7 @@ export interface ConferenciaResult {
   totais: {
     funcionarios: number;
     divergentes: number;
+    aLancar: number;
     comissaoPdf: number;
     comissaoPlan: number;
     gratificacaoPdf: number;
@@ -134,45 +135,11 @@ export function conferir(
       divergencias: [],
     };
 
+    // Comissão/Gratificação/NPS/Prêmio/Adiant. Prêmio NÃO vêm no PDF — vêm só nas planilhas
+    // e devem ser ADICIONADOS ao colaborador na próxima folha. Por isso não comparamos.
     if (!planEntry) {
-      item.status = "so_pdf";
-      item.divergencias.push("Funcionário não encontrado nas planilhas de comissão/gratificação");
-    } else {
-      // Para conferir gratificação, comparamos:
-      // - PDF gratificacao (que pode incluir 20+286 caso parser não tenha separado)
-      //   contra Planilha gratificacao + gratificacaoNps QUANDO PDF não separa
-      // Estratégia: se o parser do PDF não separou NPS, soma planilha 20+286 para comparar com gratificacao do PDF.
-      const npsPdfSeparado = item.gratificacaoNpsPdf > 0;
-      const gratifPlanComparavel = npsPdfSeparado
-        ? item.gratificacaoPlan
-        : item.gratificacaoPlan + item.gratificacaoNpsPlan;
-
-      if (!approxEqual(item.comissaoPdf, item.comissaoPlan, TOL)) {
-        item.divergencias.push(
-          `Comissão (37): PDF R$ ${item.comissaoPdf.toFixed(2)} × Planilha R$ ${item.comissaoPlan.toFixed(2)}`
-        );
-      }
-      if (!approxEqual(item.gratificacaoPdf, gratifPlanComparavel, TOL)) {
-        const detalhe = npsPdfSeparado
-          ? `PDF R$ ${item.gratificacaoPdf.toFixed(2)} × Planilha R$ ${item.gratificacaoPlan.toFixed(2)}`
-          : `PDF R$ ${item.gratificacaoPdf.toFixed(2)} × Planilha (20+NPS) R$ ${gratifPlanComparavel.toFixed(2)}`;
-        item.divergencias.push(`Gratificação (20${npsPdfSeparado ? "" : "+286"}): ${detalhe}`);
-      }
-      if (npsPdfSeparado && !approxEqual(item.gratificacaoNpsPdf, item.gratificacaoNpsPlan, TOL)) {
-        item.divergencias.push(
-          `Gratificação NPS (286): PDF R$ ${item.gratificacaoNpsPdf.toFixed(2)} × Planilha R$ ${item.gratificacaoNpsPlan.toFixed(2)}`
-        );
-      }
-      if (!approxEqual(item.premioPdf, item.premioPlan, TOL)) {
-        item.divergencias.push(
-          `Prêmio (219): PDF R$ ${item.premioPdf.toFixed(2)} × Planilha R$ ${item.premioPlan.toFixed(2)}`
-        );
-      }
-      if (!approxEqual(item.adiantPremioPdf, item.adiantPremioPlan, TOL)) {
-        item.divergencias.push(
-          `Adiant. Prêmio (241): PDF R$ ${item.adiantPremioPdf.toFixed(2)} × Planilha R$ ${item.adiantPremioPlan.toFixed(2)}`
-        );
-      }
+      // Funcionário só no PDF, sem planilha de variáveis: ok, sem nada a lançar.
+      // Não marca como divergência.
     }
 
     if (item.divergencias.length > 0 && item.status === "ok") item.status = "divergente";
@@ -201,7 +168,7 @@ export function conferir(
         emprestimosEsocialQtd: 0,
         bancosEsocial: [],
         status: "so_planilha",
-        divergencias: ["Funcionário existe na planilha de comissão mas NÃO está no PDF da folha"],
+        divergencias: [],
       });
     }
   }
@@ -236,7 +203,8 @@ export function conferir(
   const totais = itens.reduce(
     (acc, i) => {
       acc.funcionarios += 1;
-      if (i.status !== "ok") acc.divergentes += 1;
+      if (i.status === "divergente") acc.divergentes += 1;
+      if (i.status === "so_planilha") acc.aLancar += 1;
       acc.comissaoPdf += i.comissaoPdf;
       acc.comissaoPlan += i.comissaoPlan;
       acc.gratificacaoPdf += i.gratificacaoPdf;
@@ -246,7 +214,7 @@ export function conferir(
       return acc;
     },
     {
-      funcionarios: 0, divergentes: 0,
+      funcionarios: 0, divergentes: 0, aLancar: 0,
       comissaoPdf: 0, comissaoPlan: 0,
       gratificacaoPdf: 0, gratificacaoPlan: 0,
       gratificacaoNpsPdf: 0, gratificacaoNpsPlan: 0,
