@@ -223,6 +223,7 @@ function DashboardPage() {
           <div className="grid md:grid-cols-4 gap-4">
             <Kpi label="Funcionários" value={totais.atual.func} prev={totais.anterior?.func} icon={<Users className="h-4 w-4" />} />
             <Kpi label="Empréstimos (qtd)" value={totais.atual.empQtd} prev={totais.anterior?.empQtd} icon={<Banknote className="h-4 w-4" />} />
+            <Kpi label="Empréstimos (R$)" value={totais.atual.empVal} prev={totais.anterior?.empVal} money icon={<Banknote className="h-4 w-4" />} />
             <Kpi label="Comissão (R$)" value={totais.atual.comissao} prev={totais.anterior?.comissao} money icon={<TrendingUp className="h-4 w-4" />} />
             <Kpi label="Gratificação (R$)" value={totais.atual.gratif} prev={totais.anterior?.gratif} money icon={<Gift className="h-4 w-4" />} />
             <Kpi label="Prêmio (R$)" value={totais.atual.premio} prev={totais.anterior?.premio} money />
