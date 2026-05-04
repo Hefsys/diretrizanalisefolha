@@ -278,6 +278,11 @@ function DashboardPage() {
           </Card>
         </TabsContent>
 
+        {/* ================== A LANÇAR ================== */}
+        <TabsContent value="alancar" className="space-y-4 mt-4">
+          <ALancarTab itens={data.itensAtual} competencia={data.atual.competencia} empresa={data.atual.empresa ?? ""} />
+        </TabsContent>
+
         {/* ================== EMPRÉSTIMOS ================== */}
         <TabsContent value="emprestimos" className="space-y-4 mt-4">
           <div className="grid md:grid-cols-3 gap-4">
