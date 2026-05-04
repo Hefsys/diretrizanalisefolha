@@ -209,8 +209,9 @@ function DashboardPage() {
       </header>
 
       <Tabs value={aba} onValueChange={setAba}>
-        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-4xl">
           <TabsTrigger value="geral">Visão Geral</TabsTrigger>
+          <TabsTrigger value="alancar">A Lançar</TabsTrigger>
           <TabsTrigger value="emprestimos">Empréstimos</TabsTrigger>
           <TabsTrigger value="comissoes">Comissões</TabsTrigger>
           <TabsTrigger value="beneficios">Benefícios</TabsTrigger>
