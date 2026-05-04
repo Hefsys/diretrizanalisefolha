@@ -241,7 +241,8 @@ function DashboardPage() {
                     <th className="p-2">Nome</th>
                     <th className="p-2">Mat.</th>
                     <th className="p-2">Setor</th>
-                    <th className="p-2 text-center">Empréstimos</th>
+                    <th className="p-2 text-center">Empréstimos (qtd)</th>
+                    <th className="p-2 text-right">Empréstimos (R$)</th>
                     <th className="p-2 text-right">Comissão</th>
                     <th className="p-2 text-right">Δ Comissão vs ant.</th>
                     <th className="p-2 text-right">Gratificação</th>
