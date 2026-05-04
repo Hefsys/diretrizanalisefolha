@@ -43,6 +43,36 @@ function NovaConferencia() {
     cnpjPdf: string;
   } | null>(null);
 
+  type EtapaId = "pdf" | "planilhas" | "esocial" | "conferindo" | "salvando" | "redirecionando";
+  type EtapaStatus = "pending" | "running" | "done" | "error";
+  const ETAPAS: { id: EtapaId; label: string }[] = [
+    { id: "pdf", label: "Lendo PDF do Domínio" },
+    { id: "planilhas", label: "Lendo planilhas de comissão" },
+    { id: "esocial", label: "Lendo eSocial" },
+    { id: "conferindo", label: "Conferindo dados" },
+    { id: "salvando", label: "Salvando no banco" },
+    { id: "redirecionando", label: "Abrindo dashboard" },
+  ];
+  const [etapas, setEtapas] = useState<Record<EtapaId, { status: EtapaStatus; detalhe?: string }>>({
+    pdf: { status: "pending" },
+    planilhas: { status: "pending" },
+    esocial: { status: "pending" },
+    conferindo: { status: "pending" },
+    salvando: { status: "pending" },
+    redirecionando: { status: "pending" },
+  });
+  const setEtapa = (id: EtapaId, status: EtapaStatus, detalhe?: string) =>
+    setEtapas((prev) => ({ ...prev, [id]: { status, detalhe } }));
+  const resetEtapas = () =>
+    setEtapas({
+      pdf: { status: "pending" },
+      planilhas: { status: "pending" },
+      esocial: { status: "pending" },
+      conferindo: { status: "pending" },
+      salvando: { status: "pending" },
+      redirecionando: { status: "pending" },
+    });
+
   const pode = pdfFile && planFiles.length > 0;
 
   const yieldUI = () => new Promise<void>((r) => setTimeout(r, 0));
