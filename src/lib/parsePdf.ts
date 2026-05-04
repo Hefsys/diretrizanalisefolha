@@ -5,6 +5,13 @@ import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc as string;
 
+export interface EmprestimoPdf {
+  descricao: string;
+  banco?: string;
+  numeroContrato?: string;
+  parcela: number;
+}
+
 export interface PdfFuncionario {
   matricula: string;
   nome: string;
@@ -15,10 +22,16 @@ export interface PdfFuncionario {
   gratificacaoNps: number; // verba 286 (NPS)
   premio: number;          // verba 219
   adiantPremio: number;    // verba 241
+  salarioBase: number;     // verba 1 (SALARIO)
+  valeTransporte: number;  // VT
+  valeRefeicao: number;    // VR/VA
+  planoSaude: number;      // plano de saúde
+  outrosBeneficios: { descricao: string; valor: number }[];
   baseInss: number;
   valorFgts: number;
   emprestimos: number;    // soma de "DESC. EMP. CRED. TRAB" descontos
   emprestimosCount: number;
+  emprestimosLista: EmprestimoPdf[];
   proventos: number;
   descontos: number;
   liquido: number;
