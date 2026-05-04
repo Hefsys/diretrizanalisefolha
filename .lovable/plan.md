@@ -1,46 +1,35 @@
-## Contexto
+## Diagnóstico
 
-Confirmei lendo o PDF que você acabou de enviar (`Folha_Mensal_-_Validada-2.pdf`, competência 03/2026, COBARSA MOTOS): as verbas **aparecem sim no PDF**, sem acentuação, exatamente como o parser já espera:
+Confirmei no banco que ABNER e AIRTON estão com `comissao_pdf=0` e `gratificacao_pdf=0`, mesmo com os valores presentes no PDF (visto na sua captura: `37 COMISSOES 5.896,90 5.896,90 P` e `20 GRATIFICACOES 100,00 100,00 P`).
 
-- `37 COMISSOES … 2.037,00 P`
-- `20 GRATIFICACOES … 100,00 P`
-- `286 GRATIFICACAO NPS … 200,00 P`
-- (e os códigos `219 PREMIO` / `241 ADIANT.PREMIO` quando existem)
+A causa está em `src/lib/parsePdf.ts`, função `tryExtractValueByCode`. A regex atual é:
 
-O `parsePdf.ts` já extrai esses cinco códigos corretamente (linhas 79–83 e 163–167). O problema atual é que, na rodada anterior, o `conferir.ts` foi alterado para **não comparar mais** essas verbas (porque você havia dito que não vinham no PDF). Agora que confirmamos que vêm, é só restaurar a comparação.
+```
+(?:^|\s)<COD>([A-ZÀ-Úa-zà-ú\.\/\-0-9 ]*?)\s+(\d...,\d{2})\s*P\b
+```
 
-A regra dos empréstimos (eSocial) **continua igual**: não tem no PDF, é dado para adicionar ao colaborador na próxima folha.
+A **classe de caracteres do meio NÃO inclui vírgula `,`**. Em linhas com duas colunas numéricas (Referência + Valor) — padrão do Domínio para verbas como COMISSÕES e GRATIFICAÇÕES — o regex precisa "pular" o primeiro número (`5.896,90`) para chegar no segundo (`5.896,90 P`). Como `,` não está na classe, o regex trava no primeiro `,` e não consegue avançar, falhando o match e retornando `0`.
 
-## O que vai mudar
+Verbas que aparecem com **um único número** (ex.: `805 MEDIA VALOR FERIAS 4.754,57 P`) funcionam por acaso — não há referência intermediária. Por isso só algumas verbas falharam.
 
-### 1. `src/lib/conferir.ts` — voltar a comparar PDF × Planilha
+## Correção
 
-Para cada funcionário com correspondência PDF + planilha, comparar (com tolerância `TOL = 0,05`) e gerar divergências:
+Reescrever `tryExtractValueByCode` em `src/lib/parsePdf.ts` para usar uma estratégia mais robusta, sem depender de classe de caracteres frágil:
 
-| Campo | Origem PDF | Origem Planilha |
-|---|---|---|
-| Comissão (37) | `comissaoPdf` | `comissaoPlan` |
-| Gratificação (20) | `gratificacaoPdf` | `gratificacaoPlan` |
-| Gratificação NPS (286) | `gratificacaoNpsPdf` | `gratificacaoNpsPlan` |
-| Prêmio (219) | `premioPdf` | `premioPlan` |
-| Adiant. Prêmio (241) | `adiantPremioPdf` | `adiantPremioPlan` |
+1. Procurar o início da verba com `(?:^|\s)<COD>\s*[A-ZÀ-Úa-zà-ú]` (código + descrição alfabética inicia).
+2. A partir daí, capturar o "tail" da linha até encontrar `(\d{1,3}(?:\.\d{3})*,\d{2})\s*P\b` — pegando o **último** número-com-P do segmento que pertence a esta verba (parando antes do próximo código de verba ou fim da linha).
+3. Retornar a soma de todos os matches (continua suportando múltiplas ocorrências do mesmo código).
 
-Quando `|pdf − planilha| > 0,05`, adicionar mensagem em `divergencias[]` no formato:
-`"Comissão: PDF 2.037,00 × Planilha 1.900,00 (dif 137,00)"` e marcar `status = "divergente"`.
+Implementação prática: dividir o bloco em "tokens de verba" — para cada match de `(?:^|\s)(\d{1,3})\s+([A-ZÀ-Ú])`, capturar o trecho até o próximo código, e dentro dele extrair o último valor seguido de `P` (provento) ou `D` (desconto, conforme o caso). Isso elimina a fragilidade da classe de caracteres.
 
-Se a verba existe **só na planilha** (PDF = 0): também é divergência ("falta lançar no PDF: …").
-Se existe **só no PDF** (planilha = 0): divergência ("não consta na planilha de variáveis: …").
+## Verificação
 
-**Empréstimos (eSocial)**: continua como hoje — apenas listados como dado a adicionar, sem alarme/divergência. Sem mudanças aqui.
+Após o ajuste, basta o usuário **reenviar a mesma análise** (novo upload do PDF + planilhas) — não há reparser dos dados antigos no banco. O resultado esperado para AIRTON:
+- `comissao_pdf = 5.896,90` (= planilha → status `ok`)
+- `gratificacao_pdf = 100,00` (= planilha → status `ok`)
 
-**Casos `so_planilha` / `so_pdf`** (funcionário sem match): permanecem como estão hoje.
+E para ABNER, conferir se `gratificacao_pdf` bate com `200,00` da planilha.
 
-### 2. Nada muda em `parsePdf.ts`, `parseXls.ts`, no schema do banco ou no dashboard
+## Arquivos a alterar
 
-Os campos já existem em `conferencia_itens` (`comissao_pdf`, `comissao_planilha`, `gratificacao_pdf/planilha`, `gratificacao_nps_pdf/planilha`, `premio_pdf/planilha`, `adiant_premio_pdf/planilha`) e o dashboard já mostra essas comparações na aba "Conferência" via `divergencias[]`. Como `conferir.ts` é executado no momento do upload, conferências **já salvas** continuarão sem essas divergências; conferências **novas** (re-upload do PDF + planilhas) aparecerão com a comparação correta.
-
-## Como validar depois
-
-1. Re-enviar o PDF + planilhas de uma competência conhecida.
-2. Abrir o dashboard → aba "Conferência" → conferir que linhas com diferença real entre PDF e planilha ficam marcadas como "divergente" com a mensagem descritiva.
-3. Conferir que empréstimos do eSocial continuam aparecendo apenas como dado a adicionar (sem virar divergência).
+- `src/lib/parsePdf.ts` — reescrever `tryExtractValueByCode` (e ajustar lógica análoga de extração de salário-base verba `1`, que tem o mesmo problema potencial).
