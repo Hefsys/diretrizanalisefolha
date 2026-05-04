@@ -595,3 +595,105 @@ function competenciaAnterior(comp: string): string | null {
   }
   return null;
 }
+
+function ALancarTab({ itens, competencia, empresa }: { itens: ItemRow[]; competencia: string; empresa: string }) {
+  const linhas = itens
+    .map((i) => {
+      const com = Number(i.comissao_planilha) + Number(i.comissao_pdf);
+      const g20 = Number(i.gratificacao_planilha) + Number(i.gratificacao_pdf);
+      const nps = Number(i.gratificacao_nps_planilha) + Number(i.gratificacao_nps_pdf);
+      const prm = Number(i.premio_planilha) + Number(i.premio_pdf);
+      const adi = Number(i.adiant_premio_planilha) + Number(i.adiant_premio_pdf);
+      const total = com + g20 + nps + prm + adi;
+      return { i, com, g20, nps, prm, adi, total };
+    })
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const totGeral = linhas.reduce(
+    (acc, r) => ({
+      com: acc.com + r.com, g20: acc.g20 + r.g20, nps: acc.nps + r.nps,
+      prm: acc.prm + r.prm, adi: acc.adi + r.adi, total: acc.total + r.total,
+    }),
+    { com: 0, g20: 0, nps: 0, prm: 0, adi: 0, total: 0 }
+  );
+
+  const exportar = () => {
+    const header = ["Matrícula", "CPF", "Nome", "Setor", "Comissão (37)", "Gratif. 20", "NPS 286", "Prêmio 219", "Adiant. 241", "Total a lançar"];
+    const rows = linhas.map((r) => [
+      r.i.matricula ?? "", r.i.cpf ?? "", r.i.nome, r.i.setor ?? "",
+      r.com.toFixed(2), r.g20.toFixed(2), r.nps.toFixed(2), r.prm.toFixed(2), r.adi.toFixed(2), r.total.toFixed(2),
+    ]);
+    const csv = [header, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `a-lancar-${empresa.replace(/\W+/g, "_")}-${competencia.replace(/\W+/g, "")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card className="p-4 space-y-4">
+      <div className="flex items-end justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">Valores a lançar na folha</h2>
+          <p className="text-xs text-muted-foreground">
+            {linhas.length} colaboradores · Total: <strong className="text-foreground">R$ {fmtBR(totGeral.total)}</strong>
+          </p>
+        </div>
+        <button onClick={exportar} className="text-sm px-3 py-1.5 rounded-md border hover:bg-muted">Exportar CSV</button>
+      </div>
+
+      <div className="overflow-auto border rounded-md">
+        <table className="w-full text-sm">
+          <thead className="bg-muted">
+            <tr className="text-left">
+              <th className="p-2">Mat.</th>
+              <th className="p-2">Nome</th>
+              <th className="p-2">Setor</th>
+              <th className="p-2 text-right">Comissão 37</th>
+              <th className="p-2 text-right">Gratif. 20</th>
+              <th className="p-2 text-right">NPS 286</th>
+              <th className="p-2 text-right">Prêmio 219</th>
+              <th className="p-2 text-right">Adiant. 241</th>
+              <th className="p-2 text-right font-bold">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((r) => (
+              <tr key={r.i.id} className="border-t hover:bg-muted/40">
+                <td className="p-2">{r.i.matricula ?? "—"}</td>
+                <td className="p-2 font-medium">{r.i.nome}</td>
+                <td className="p-2 text-xs text-muted-foreground">{r.i.setor ?? "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.com > 0 ? fmtBR(r.com) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.g20 > 0 ? fmtBR(r.g20) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.nps > 0 ? fmtBR(r.nps) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.prm > 0 ? fmtBR(r.prm) : "—"}</td>
+                <td className="p-2 text-right tabular-nums">{r.adi > 0 ? fmtBR(r.adi) : "—"}</td>
+                <td className="p-2 text-right tabular-nums font-bold">{fmtBR(r.total)}</td>
+              </tr>
+            ))}
+            {linhas.length === 0 && (
+              <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Nenhum valor a lançar nesta competência.</td></tr>
+            )}
+          </tbody>
+          {linhas.length > 0 && (
+            <tfoot className="bg-muted/60 font-semibold">
+              <tr>
+                <td className="p-2" colSpan={3}>Total geral</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.com)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.g20)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.nps)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.prm)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.adi)}</td>
+                <td className="p-2 text-right tabular-nums">{fmtBR(totGeral.total)}</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </Card>
+  );
+}
