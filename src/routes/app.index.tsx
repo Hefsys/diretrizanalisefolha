@@ -105,7 +105,8 @@ function NovaConferencia() {
         return;
       }
 
-      await finalizarConferencia(pdfData, planResults);
+      const r = await finalizarConferencia(pdfData, planResults);
+      if (r) await salvarConferencia(r);
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar arquivos");
