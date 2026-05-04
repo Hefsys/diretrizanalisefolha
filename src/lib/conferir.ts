@@ -167,7 +167,7 @@ export function conferir(
         emprestimosEsocialQtd: 0,
         bancosEsocial: [],
         status: "so_planilha",
-        divergencias: ["Funcionário existe na planilha de comissão mas NÃO está no PDF da folha"],
+        divergencias: [],
       });
     }
   }
