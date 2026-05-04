@@ -349,7 +349,7 @@ function NovaConferencia() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => exportarExcelDivergencias(result)}><FileDown className="h-4 w-4 mr-2" />Excel</Button>
               <Button variant="outline" onClick={() => exportarPdf(result)}><Download className="h-4 w-4 mr-2" />PDF</Button>
-              <Button onClick={handleSalvar}>Salvar no histórico</Button>
+              <Button onClick={() => result && salvarConferencia(result)}>Salvar no histórico</Button>
             </div>
           </div>
 
