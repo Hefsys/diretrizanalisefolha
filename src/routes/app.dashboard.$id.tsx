@@ -26,6 +26,11 @@ interface ItemRow {
   gratificacao_nps_pdf: number;
   premio_pdf: number;
   adiant_premio_pdf: number;
+  comissao_planilha: number;
+  gratificacao_planilha: number;
+  gratificacao_nps_planilha: number;
+  premio_planilha: number;
+  adiant_premio_planilha: number;
   salario_base: number;
   vale_transporte: number;
   vale_refeicao: number;
