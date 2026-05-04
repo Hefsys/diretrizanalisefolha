@@ -45,18 +45,31 @@ function NovaConferencia() {
 
   const pode = pdfFile && planFiles.length > 0;
 
+  const yieldUI = () => new Promise<void>((r) => setTimeout(r, 0));
+
   const finalizarConferencia = async (
     pdfData: Awaited<ReturnType<typeof parseDominioPdf>>,
     planResults: PlanilhaParseResult[],
   ) => {
-    const esocial = esocialFile ? await parseEsocialXlsx(esocialFile) : [];
-    if (esocialFile) toast.message(`eSocial: ${esocial.length} contratos.`);
+    let esocial: Awaited<ReturnType<typeof parseEsocialXlsx>> = [];
+    if (esocialFile) {
+      toast.message("Lendo eSocial…");
+      console.log("[conferir] iniciando parse eSocial", esocialFile.name, esocialFile.size);
+      await yieldUI();
+      esocial = await parseEsocialXlsx(esocialFile);
+      console.log("[conferir] eSocial parseado:", esocial.length);
+      toast.message(`eSocial: ${esocial.length} contratos.`);
+      await yieldUI();
+    }
+    console.log("[conferir] iniciando merge");
     const r = conferir(pdfData, planResults, esocial);
+    console.log("[conferir] merge concluído:", r.itens.length, "itens");
     if (!empresa && r.empresa) setEmpresa(r.empresa);
     if (!cnpj && r.cnpj) setCnpj(r.cnpj);
     if (!competencia && r.competencia) setCompetencia(r.competencia);
     setResult(r);
     toast.success(`Conferência concluída — ${r.totais.divergentes} divergências de ${r.totais.funcionarios} funcionários.`);
+    return r;
   };
 
   const handleConferir = async () => {
@@ -92,7 +105,8 @@ function NovaConferencia() {
         return;
       }
 
-      await finalizarConferencia(pdfData, planResults);
+      const r = await finalizarConferencia(pdfData, planResults);
+      if (r) await salvarConferencia(r);
     } catch (err: unknown) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar arquivos");
@@ -114,7 +128,8 @@ function NovaConferencia() {
       const planFinais = incluir
         ? todasPlan
         : todasPlan.filter((p) => !p.cnpj || p.cnpj === cnpjPdf);
-      await finalizarConferencia(pdfData, planFinais);
+      const r = await finalizarConferencia(pdfData, planFinais);
+      if (r) await salvarConferencia(r);
     } catch (err: unknown) {
       console.error("[responderFiliais]", err);
       toast.error(err instanceof Error ? err.message : "Erro ao processar");
@@ -123,9 +138,14 @@ function NovaConferencia() {
     }
   };
 
-  const handleSalvar = async () => {
-    if (!result || !user) return;
+  const salvarConferencia = async (resultToSave: ConferenciaResult) => {
+    if (!user) {
+      toast.error("Faça login para salvar.");
+      return;
+    }
+    const result = resultToSave;
     try {
+      toast.message("Salvando no banco…");
       const { data: conf, error } = await supabase
         .from("conferencias")
         .insert({
@@ -331,7 +351,7 @@ function NovaConferencia() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => exportarExcelDivergencias(result)}><FileDown className="h-4 w-4 mr-2" />Excel</Button>
               <Button variant="outline" onClick={() => exportarPdf(result)}><Download className="h-4 w-4 mr-2" />PDF</Button>
-              <Button onClick={handleSalvar}>Salvar no histórico</Button>
+              <Button onClick={() => result && salvarConferencia(result)}>Salvar no histórico</Button>
             </div>
           </div>
 
