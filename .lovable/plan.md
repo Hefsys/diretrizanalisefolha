@@ -1,35 +1,58 @@
-## Diagnóstico
+## Problema
 
-Confirmei no banco que ABNER e AIRTON estão com `comissao_pdf=0` e `gratificacao_pdf=0`, mesmo com os valores presentes no PDF (visto na sua captura: `37 COMISSOES 5.896,90 5.896,90 P` e `20 GRATIFICACOES 100,00 100,00 P`).
+Na conferência os valores de **gratificação/comissão/etc. estão dobrados** em relação à planilha (ex.: ANA — planilha 400,00, dashboard 800,00; JOYCE 500→1.000; LEONARDO 800→1.600; MARGARETH 430,35→860,70; SEVERINA 4.430,35 que aparece duas vezes em colaboradoras diferentes — Margareth e Severina mostram o mesmo 437,63 de empréstimo também, sintoma do mesmo problema).
 
-A causa está em `src/lib/parsePdf.ts`, função `tryExtractValueByCode`. A regex atual é:
+## Causa
 
-```
-(?:^|\s)<COD>([A-ZÀ-Úa-zà-ú\.\/\-0-9 ]*?)\s+(\d...,\d{2})\s*P\b
-```
+Em `src/lib/parsePdf.ts`, a função `tryExtractValueByCode` percorre **todas** as ocorrências do código de verba dentro do bloco do funcionário (loop `while ((m = startRe.exec(block)) !== null)`) e soma o valor de cada uma.
 
-A **classe de caracteres do meio NÃO inclui vírgula `,`**. Em linhas com duas colunas numéricas (Referência + Valor) — padrão do Domínio para verbas como COMISSÕES e GRATIFICAÇÕES — o regex precisa "pular" o primeiro número (`5.896,90`) para chegar no segundo (`5.896,90 P`). Como `,` não está na classe, o regex trava no primeiro `,` e não consegue avançar, falhando o match e retornando `0`.
+Os PDFs da Domínio repetem os mesmos códigos em mais de uma seção do bloco do funcionário (tabela de Eventos + bloco de Acumulados / Totais por verba na quebra de página). Resultado: cada verba é contada **2x**.
 
-Verbas que aparecem com **um único número** (ex.: `805 MEDIA VALOR FERIAS 4.754,57 P`) funcionam por acaso — não há referência intermediária. Por isso só algumas verbas falharam.
+O mesmo padrão atinge `emprestimos` (regex global no bloco soma todas as ocorrências de `DESC. EMP. CRED. TRAB`, contando linhas repetidas em outra página).
 
-## Correção
+## Plano de correção
 
-Reescrever `tryExtractValueByCode` em `src/lib/parsePdf.ts` para usar uma estratégia mais robusta, sem depender de classe de caracteres frágil:
+Arquivo único: `src/lib/parsePdf.ts`.
 
-1. Procurar o início da verba com `(?:^|\s)<COD>\s*[A-ZÀ-Úa-zà-ú]` (código + descrição alfabética inicia).
-2. A partir daí, capturar o "tail" da linha até encontrar `(\d{1,3}(?:\.\d{3})*,\d{2})\s*P\b` — pegando o **último** número-com-P do segmento que pertence a esta verba (parando antes do próximo código de verba ou fim da linha).
-3. Retornar a soma de todos os matches (continua suportando múltiplas ocorrências do mesmo código).
+1. **`tryExtractValueByCode`**: usar **apenas a primeira ocorrência** do código por verba dentro do bloco do funcionário (não somar múltiplas instâncias). Trocar o `while` que acumula em `total` por um `match` que pega o primeiro segmento e extrai dele o último valor seguido de `P`. Isso preserva a correção anterior (evita confundir Referência × Valor) e elimina a duplicação por seções repetidas.
 
-Implementação prática: dividir o bloco em "tokens de verba" — para cada match de `(?:^|\s)(\d{1,3})\s+([A-ZÀ-Ú])`, capturar o trecho até o próximo código, e dentro dele extrair o último valor seguido de `P` (provento) ou `D` (desconto, conforme o caso). Isso elimina a fragilidade da classe de caracteres.
+2. **Empréstimos (`DESC. EMP. CRED. TRAB`)**: deduplicar por linha. Em vez de somar todas as matches no bloco concatenado, iterar `aggregateLines`, filtrar as que casam o padrão e usar uma chave de deduplicação (linha normalizada — sem espaços extras) para somar cada parcela uma única vez. `emprestimosCount` e `emprestimosLista` passam a refletir essa lista deduplicada.
+
+3. **Salário base (código `1`)**: aplicar a mesma estratégia "primeira ocorrência apenas".
 
 ## Verificação
 
-Após o ajuste, basta o usuário **reenviar a mesma análise** (novo upload do PDF + planilhas) — não há reparser dos dados antigos no banco. O resultado esperado para AIRTON:
-- `comissao_pdf = 5.896,90` (= planilha → status `ok`)
-- `gratificacao_pdf = 100,00` (= planilha → status `ok`)
+Após o ajuste o usuário precisa **reenviar o PDF + planilhas** (a análise é processada no upload). Conferir na aba Visão Geral:
+- ANA → 400,00
+- LEONARDO → 800,00
+- MARGARETH → 430,35 e empréstimo aparecendo só nela (não em SEVERINA)
 
-E para ABNER, conferir se `gratificacao_pdf` bate com `200,00` da planilha.
+## Detalhes técnicos
 
-## Arquivos a alterar
+```ts
+// tryExtractValueByCode — somente a primeira ocorrência
+function tryExtractValueByCode(block: string, codes: string[]): number {
+  let total = 0;
+  for (const c of codes) {
+    const startRe = new RegExp(`(?:^|\\s)${c}\\s*(?=[A-ZÀ-Úa-zà-ú])`);
+    const m = startRe.exec(block);
+    if (!m) continue;
+    const startIdx = m.index + m[0].length;
+    const rest = block.slice(startIdx);
+    const nextCodeMatch = rest.match(/\s\d{1,4}\s*(?=[A-ZÀ-Úa-zà-ú])/);
+    const segment = nextCodeMatch ? rest.slice(0, nextCodeMatch.index) : rest;
+    const valMatches = [...segment.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*P\b/g)];
+    if (valMatches.length > 0) total += parseBR(valMatches[valMatches.length - 1][1]);
+  }
+  return total;
+}
 
-- `src/lib/parsePdf.ts` — reescrever `tryExtractValueByCode` (e ajustar lógica análoga de extração de salário-base verba `1`, que tem o mesmo problema potencial).
+// empréstimos — dedup por linha normalizada
+const seen = new Set<string>();
+const empLinhas = aggregateLines.filter((ln) => /DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB/i.test(ln))
+  .filter((ln) => {
+    const k = ln.replace(/\s+/g, " ").trim();
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+```

@@ -102,22 +102,19 @@ function parseEmpregadoHeader(line: string): { matricula: string; nome: string; 
 function tryExtractValueByCode(block: string, codes: string[]): number {
   let total = 0;
   for (const c of codes) {
-    // Anchor: código + (espaço opcional) + letra (descrição). Evita casar
-    // com números soltos (ex.: "120" não bate com código "20").
-    const startRe = new RegExp(`(?:^|\\s)${c}\\s*(?=[A-ZÀ-Úa-zà-ú])`, "g");
-    let m: RegExpExecArray | null;
-    while ((m = startRe.exec(block)) !== null) {
-      const startIdx = m.index + m[0].length;
-      // Segmento: do início da descrição até o próximo código de verba
-      // (padrão: espaço + 1-4 dígitos + espaço + letra) ou fim do bloco.
-      const rest = block.slice(startIdx);
-      const nextCodeMatch = rest.match(/\s\d{1,4}\s*(?=[A-ZÀ-Úa-zà-ú])/);
-      const segment = nextCodeMatch ? rest.slice(0, nextCodeMatch.index) : rest;
-      // Dentro do segmento, pega o último valor seguido de P (provento).
-      const valMatches = [...segment.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*P\b/g)];
-      if (valMatches.length > 0) {
-        total += parseBR(valMatches[valMatches.length - 1][1]);
-      }
+    // Apenas a PRIMEIRA ocorrência do código no bloco do funcionário —
+    // PDFs da Domínio repetem os códigos em seções de acumulados, o que
+    // duplicaria os valores se somássemos todas as ocorrências.
+    const startRe = new RegExp(`(?:^|\\s)${c}\\s*(?=[A-ZÀ-Úa-zà-ú])`);
+    const m = startRe.exec(block);
+    if (!m) continue;
+    const startIdx = m.index + m[0].length;
+    const rest = block.slice(startIdx);
+    const nextCodeMatch = rest.match(/\s\d{1,4}\s*(?=[A-ZÀ-Úa-zà-ú])/);
+    const segment = nextCodeMatch ? rest.slice(0, nextCodeMatch.index) : rest;
+    const valMatches = [...segment.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})\s*P\b/g)];
+    if (valMatches.length > 0) {
+      total += parseBR(valMatches[valMatches.length - 1][1]);
     }
   }
   return total;
@@ -195,25 +192,29 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
     current.valeRefeicao = findByKeywords(/VALE\s*(REFEI|ALIMENT)|\bVR\b|\bVA\b/i);
     current.planoSaude = findByKeywords(/PLANO\s*SA[ÚU]DE|ASSIST[ÊE]NCIA\s*M[ÉE]DICA|UNIMED|AMIL/i);
 
-    // Empréstimos descontados (linhas com "DESC. EMP. CRED. TRAB" + NUM D)
-    const empMatches = [...block.matchAll(/DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB[^\n]*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*D\b/g)];
-    current.emprestimos = empMatches.reduce((a, m) => a + parseBR(m[1]), 0);
-    current.emprestimosCount = empMatches.length;
-    // Lista detalhada — uma entrada por linha encontrada
-    current.emprestimosLista = aggregateLines
-      .filter((ln) => /DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB/i.test(ln))
-      .map((ln) => {
-        const nums = [...ln.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
-        const parcela = nums.length > 0 ? parseBR(nums[nums.length - 1][1]) : 0;
-        const bancoMatch = ln.match(/(BANCO\s+[A-Z\s]+|BMG|ITAU|ITA[ÚU]|BRADESCO|SANTANDER|CAIXA|BB|BANRISUL|PAN|SAFRA|DAYCOVAL|FACTA|OLE|MERCANTIL)/i);
-        const contratoMatch = ln.match(/(\d{6,})/);
-        return {
-          descricao: ln.replace(/\s+/g, " ").slice(0, 120),
-          banco: bancoMatch?.[1]?.trim(),
-          numeroContrato: contratoMatch?.[1],
-          parcela,
-        };
+    // Empréstimos descontados — deduplica por linha (Domínio repete bloco em outra página)
+    const seenEmp = new Set<string>();
+    const empLinhas = aggregateLines.filter((ln) => /DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB/i.test(ln))
+      .filter((ln) => {
+        const k = ln.replace(/\s+/g, " ").trim();
+        if (seenEmp.has(k)) return false;
+        seenEmp.add(k);
+        return true;
       });
+    current.emprestimosLista = empLinhas.map((ln) => {
+      const nums = [...ln.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+      const parcela = nums.length > 0 ? parseBR(nums[nums.length - 1][1]) : 0;
+      const bancoMatch = ln.match(/(BANCO\s+[A-Z\s]+|BMG|ITAU|ITA[ÚU]|BRADESCO|SANTANDER|CAIXA|BB|BANRISUL|PAN|SAFRA|DAYCOVAL|FACTA|OLE|MERCANTIL)/i);
+      const contratoMatch = ln.match(/(\d{6,})/);
+      return {
+        descricao: ln.replace(/\s+/g, " ").slice(0, 120),
+        banco: bancoMatch?.[1]?.trim(),
+        numeroContrato: contratoMatch?.[1],
+        parcela,
+      };
+    });
+    current.emprestimos = current.emprestimosLista.reduce((a, e) => a + e.parcela, 0);
+    current.emprestimosCount = current.emprestimosLista.length;
     funcionarios.push(current);
     current = null;
     aggregateLines = [];
