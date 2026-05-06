@@ -192,25 +192,29 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
     current.valeRefeicao = findByKeywords(/VALE\s*(REFEI|ALIMENT)|\bVR\b|\bVA\b/i);
     current.planoSaude = findByKeywords(/PLANO\s*SA[ÚU]DE|ASSIST[ÊE]NCIA\s*M[ÉE]DICA|UNIMED|AMIL/i);
 
-    // Empréstimos descontados (linhas com "DESC. EMP. CRED. TRAB" + NUM D)
-    const empMatches = [...block.matchAll(/DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB[^\n]*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*D\b/g)];
-    current.emprestimos = empMatches.reduce((a, m) => a + parseBR(m[1]), 0);
-    current.emprestimosCount = empMatches.length;
-    // Lista detalhada — uma entrada por linha encontrada
-    current.emprestimosLista = aggregateLines
-      .filter((ln) => /DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB/i.test(ln))
-      .map((ln) => {
-        const nums = [...ln.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
-        const parcela = nums.length > 0 ? parseBR(nums[nums.length - 1][1]) : 0;
-        const bancoMatch = ln.match(/(BANCO\s+[A-Z\s]+|BMG|ITAU|ITA[ÚU]|BRADESCO|SANTANDER|CAIXA|BB|BANRISUL|PAN|SAFRA|DAYCOVAL|FACTA|OLE|MERCANTIL)/i);
-        const contratoMatch = ln.match(/(\d{6,})/);
-        return {
-          descricao: ln.replace(/\s+/g, " ").slice(0, 120),
-          banco: bancoMatch?.[1]?.trim(),
-          numeroContrato: contratoMatch?.[1],
-          parcela,
-        };
+    // Empréstimos descontados — deduplica por linha (Domínio repete bloco em outra página)
+    const seenEmp = new Set<string>();
+    const empLinhas = aggregateLines.filter((ln) => /DESC\.?\s*EMP\.?\s*CRED\.?\s*TRAB/i.test(ln))
+      .filter((ln) => {
+        const k = ln.replace(/\s+/g, " ").trim();
+        if (seenEmp.has(k)) return false;
+        seenEmp.add(k);
+        return true;
       });
+    current.emprestimosLista = empLinhas.map((ln) => {
+      const nums = [...ln.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2})/g)];
+      const parcela = nums.length > 0 ? parseBR(nums[nums.length - 1][1]) : 0;
+      const bancoMatch = ln.match(/(BANCO\s+[A-Z\s]+|BMG|ITAU|ITA[ÚU]|BRADESCO|SANTANDER|CAIXA|BB|BANRISUL|PAN|SAFRA|DAYCOVAL|FACTA|OLE|MERCANTIL)/i);
+      const contratoMatch = ln.match(/(\d{6,})/);
+      return {
+        descricao: ln.replace(/\s+/g, " ").slice(0, 120),
+        banco: bancoMatch?.[1]?.trim(),
+        numeroContrato: contratoMatch?.[1],
+        parcela,
+      };
+    });
+    current.emprestimos = current.emprestimosLista.reduce((a, e) => a + e.parcela, 0);
+    current.emprestimosCount = current.emprestimosLista.length;
     funcionarios.push(current);
     current = null;
     aggregateLines = [];
