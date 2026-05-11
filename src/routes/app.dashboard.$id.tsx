@@ -607,11 +607,11 @@ function ColaboradorDetalhe({ cur, prev, emprestimos }: { cur: ItemRow; prev: It
       </SheetHeader>
       <div className="mt-4 space-y-4">
         <Section title="Comissões e gratificações (a lançar)">
-          <Linha label="Comissão (37)" value={Number(cur.comissao_planilha) + Number(cur.comissao_pdf)} prev={Number(prev?.comissao_planilha ?? 0) + Number(prev?.comissao_pdf ?? 0)} />
-          <Linha label="Gratificação (20)" value={Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf)} prev={Number(prev?.gratificacao_planilha ?? 0) + Number(prev?.gratificacao_pdf ?? 0)} />
-          <Linha label="Gratificação NPS (286)" value={Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf)} prev={Number(prev?.gratificacao_nps_planilha ?? 0) + Number(prev?.gratificacao_nps_pdf ?? 0)} />
-          <Linha label="Prêmio (219)" value={Number(cur.premio_planilha) + Number(cur.premio_pdf)} prev={Number(prev?.premio_planilha ?? 0) + Number(prev?.premio_pdf ?? 0)} />
-          <Linha label="Adiant. Prêmio (241)" value={Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf)} prev={Number(prev?.adiant_premio_planilha ?? 0) + Number(prev?.adiant_premio_pdf ?? 0)} />
+          <Linha label="Comissão (37)" value={valorConferido(cur.comissao_planilha, cur.comissao_pdf)} prev={valorConferido(prev?.comissao_planilha, prev?.comissao_pdf)} />
+          <Linha label="Gratificação (20)" value={valorConferido(cur.gratificacao_planilha, cur.gratificacao_pdf)} prev={valorConferido(prev?.gratificacao_planilha, prev?.gratificacao_pdf)} />
+          <Linha label="Gratificação NPS (286)" value={valorConferido(cur.gratificacao_nps_planilha, cur.gratificacao_nps_pdf)} prev={valorConferido(prev?.gratificacao_nps_planilha, prev?.gratificacao_nps_pdf)} />
+          <Linha label="Prêmio (219)" value={valorConferido(cur.premio_planilha, cur.premio_pdf)} prev={valorConferido(prev?.premio_planilha, prev?.premio_pdf)} />
+          <Linha label="Adiant. Prêmio (241)" value={valorConferido(cur.adiant_premio_planilha, cur.adiant_premio_pdf)} prev={valorConferido(prev?.adiant_premio_planilha, prev?.adiant_premio_pdf)} />
         </Section>
 
         <Section title="Empréstimos consignados">
@@ -722,12 +722,12 @@ function competenciaAnterior(comp: string): string | null {
 
 function ALancarTab({ itens, competencia, empresa }: { itens: ItemRow[]; competencia: string; empresa: string }) {
   const linhas = itens
-    .map((i) => {
-      const com = Number(i.comissao_planilha) + Number(i.comissao_pdf);
-      const g20 = Number(i.gratificacao_planilha) + Number(i.gratificacao_pdf);
-      const nps = Number(i.gratificacao_nps_planilha) + Number(i.gratificacao_nps_pdf);
-      const prm = Number(i.premio_planilha) + Number(i.premio_pdf);
-      const adi = Number(i.adiant_premio_planilha) + Number(i.adiant_premio_pdf);
+      .map((i) => {
+        const com = valorConferido(i.comissao_planilha, i.comissao_pdf);
+        const g20 = valorConferido(i.gratificacao_planilha, i.gratificacao_pdf);
+        const nps = valorConferido(i.gratificacao_nps_planilha, i.gratificacao_nps_pdf);
+        const prm = valorConferido(i.premio_planilha, i.premio_pdf);
+        const adi = valorConferido(i.adiant_premio_planilha, i.adiant_premio_pdf);
       const total = com + g20 + nps + prm + adi;
       return { i, com, g20, nps, prm, adi, total };
     })
