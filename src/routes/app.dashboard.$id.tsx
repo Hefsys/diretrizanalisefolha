@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtBR } from "@/lib/normalize";
+import { fmtBR, normalizeName } from "@/lib/normalize";
 import { ArrowDown, ArrowUp, Minus, Users, Banknote, TrendingUp, Gift, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,6 +69,121 @@ interface DashState {
   emprestimosAtual: EmprestimoRow[];
 }
 
+function valorConferido(pdf: number | null | undefined, planilha: number | null | undefined) {
+  return Math.max(Number(pdf ?? 0), Number(planilha ?? 0));
+}
+
+function totalPdf(row: ItemRow) {
+  return [
+    row.comissao_pdf,
+    row.gratificacao_pdf,
+    row.gratificacao_nps_pdf,
+    row.premio_pdf,
+    row.adiant_premio_pdf,
+    row.salario_base,
+    row.vale_transporte,
+    row.vale_refeicao,
+    row.plano_saude,
+    row.base_inss,
+    row.valor_fgts,
+    row.emprestimos_pdf,
+  ].reduce((acc, value) => acc + Number(value ?? 0), 0);
+}
+
+function totalPlanilha(row: ItemRow) {
+  return [
+    row.comissao_planilha,
+    row.gratificacao_planilha,
+    row.gratificacao_nps_planilha,
+    row.premio_planilha,
+    row.adiant_premio_planilha,
+  ].reduce((acc, value) => acc + Number(value ?? 0), 0);
+}
+
+function nomesCompativeis(a: string, b: string) {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (!na.startsWith(nb) && !nb.startsWith(na)) return false;
+  const ta = na.split(" ");
+  const tb = nb.split(" ");
+  return Math.min(ta.length, tb.length) >= 3 && ta.slice(0, 3).join(" ") === tb.slice(0, 3).join(" ");
+}
+
+function deveMesclarItens(atual: ItemRow, candidato: ItemRow) {
+  if (atual.cpf && candidato.cpf && atual.cpf === candidato.cpf) return true;
+  if (atual.matricula && candidato.matricula && atual.matricula === candidato.matricula) return true;
+  if (!nomesCompativeis(atual.nome, candidato.nome)) return false;
+
+  const atualSoPdf = totalPdf(atual) > 0 && totalPlanilha(atual) === 0;
+  const atualSoPlanilha = totalPlanilha(atual) > 0 && totalPdf(atual) === 0;
+  const candSoPdf = totalPdf(candidato) > 0 && totalPlanilha(candidato) === 0;
+  const candSoPlanilha = totalPlanilha(candidato) > 0 && totalPdf(candidato) === 0;
+  const complementar = (atualSoPdf && candSoPlanilha) || (atualSoPlanilha && candSoPdf);
+  const identidadeIncompleta = !atual.cpf || !candidato.cpf || !atual.matricula || !candidato.matricula;
+
+  return complementar && identidadeIncompleta;
+}
+
+function mesclarItens(base: ItemRow, extra: ItemRow): ItemRow {
+  const divergencias = [...new Set([...(Array.isArray(base.divergencias) ? base.divergencias as string[] : []), ...(Array.isArray(extra.divergencias) ? extra.divergencias as string[] : [])])];
+  const bancos = [...new Set([...(Array.isArray(base.bancos_esocial) ? base.bancos_esocial as string[] : []), ...(Array.isArray(extra.bancos_esocial) ? extra.bancos_esocial as string[] : [])])];
+  const nome = normalizeName(extra.nome).length > normalizeName(base.nome).length ? extra.nome : base.nome;
+
+  return {
+    ...base,
+    cpf: base.cpf ?? extra.cpf,
+    matricula: base.matricula ?? extra.matricula,
+    nome,
+    setor: base.setor ?? extra.setor,
+    comissao_pdf: valorConferido(base.comissao_pdf, extra.comissao_pdf),
+    gratificacao_pdf: valorConferido(base.gratificacao_pdf, extra.gratificacao_pdf),
+    gratificacao_nps_pdf: valorConferido(base.gratificacao_nps_pdf, extra.gratificacao_nps_pdf),
+    premio_pdf: valorConferido(base.premio_pdf, extra.premio_pdf),
+    adiant_premio_pdf: valorConferido(base.adiant_premio_pdf, extra.adiant_premio_pdf),
+    comissao_planilha: valorConferido(base.comissao_planilha, extra.comissao_planilha),
+    gratificacao_planilha: valorConferido(base.gratificacao_planilha, extra.gratificacao_planilha),
+    gratificacao_nps_planilha: valorConferido(base.gratificacao_nps_planilha, extra.gratificacao_nps_planilha),
+    premio_planilha: valorConferido(base.premio_planilha, extra.premio_planilha),
+    adiant_premio_planilha: valorConferido(base.adiant_premio_planilha, extra.adiant_premio_planilha),
+    salario_base: valorConferido(base.salario_base, extra.salario_base),
+    vale_transporte: valorConferido(base.vale_transporte, extra.vale_transporte),
+    vale_refeicao: valorConferido(base.vale_refeicao, extra.vale_refeicao),
+    plano_saude: valorConferido(base.plano_saude, extra.plano_saude),
+    base_inss: valorConferido(base.base_inss, extra.base_inss),
+    valor_fgts: valorConferido(base.valor_fgts, extra.valor_fgts),
+    emprestimos_pdf: valorConferido(base.emprestimos_pdf, extra.emprestimos_pdf),
+    emprestimos_esocial_qtd: valorConferido(base.emprestimos_esocial_qtd, extra.emprestimos_esocial_qtd),
+    bancos_esocial: bancos,
+    status: base.status === "divergente" || extra.status === "divergente"
+      ? "divergente"
+      : base.status === "ok" || extra.status === "ok"
+        ? "ok"
+        : "so_planilha",
+    divergencias,
+  };
+}
+
+function consolidarItens(rows: ItemRow[]) {
+  const itens: ItemRow[] = [];
+  const idMap = new Map<string, string>();
+
+  for (const row of rows) {
+    const idx = itens.findIndex((existente) => deveMesclarItens(existente, row));
+    if (idx === -1) {
+      itens.push({ ...row });
+      idMap.set(row.id, row.id);
+      continue;
+    }
+
+    itens[idx] = mesclarItens(itens[idx], row);
+    idMap.set(row.id, itens[idx].id);
+  }
+
+  return { itens, idMap };
+}
+
 function DashboardPage() {
   const { id } = Route.useParams();
   const { user, loading: authLoading } = useAuth();
@@ -118,12 +233,18 @@ function DashboardPage() {
           }
         }
 
+        const itensAtualConsolidados = consolidarItens((itens as ItemRow[]) ?? []);
+        const itensAnteriorConsolidados = consolidarItens(itensAnt);
+
         setData({
           atual: conf as ConferenciaRow,
           anterior,
-          itensAtual: (itens as ItemRow[]) ?? [],
-          itensAnterior: itensAnt,
-          emprestimosAtual: (emps as EmprestimoRow[]) ?? [],
+          itensAtual: itensAtualConsolidados.itens,
+          itensAnterior: itensAnteriorConsolidados.itens,
+          emprestimosAtual: ((emps as EmprestimoRow[]) ?? []).map((emp) => ({
+            ...emp,
+            item_id: itensAtualConsolidados.idMap.get(emp.item_id) ?? emp.item_id,
+          })),
         });
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : "Erro ao carregar dashboard");
@@ -159,13 +280,13 @@ function DashboardPage() {
 
   const totais = useMemo(() => {
     if (!data) return null;
-    const sumItem = (rows: ItemRow[]) => ({
+      const sumItem = (rows: ItemRow[]) => ({
       func: rows.length,
       empQtd: rows.reduce((a, r) => a + (r.emprestimos_esocial_qtd ?? 0), 0),
       empVal: rows.reduce((a, r) => a + Number(r.emprestimos_pdf ?? 0), 0),
-      comissao: rows.reduce((a, r) => a + Number(r.comissao_pdf ?? 0) + Number(r.comissao_planilha ?? 0), 0),
-      gratif: rows.reduce((a, r) => a + Number(r.gratificacao_pdf ?? 0) + Number(r.gratificacao_nps_pdf ?? 0) + Number(r.gratificacao_planilha ?? 0) + Number(r.gratificacao_nps_planilha ?? 0), 0),
-      premio: rows.reduce((a, r) => a + Number(r.premio_pdf ?? 0) + Number(r.premio_planilha ?? 0) + Number(r.adiant_premio_pdf ?? 0) + Number(r.adiant_premio_planilha ?? 0), 0),
+        comissao: rows.reduce((a, r) => a + valorConferido(r.comissao_pdf, r.comissao_planilha), 0),
+        gratif: rows.reduce((a, r) => a + valorConferido(r.gratificacao_pdf, r.gratificacao_planilha) + valorConferido(r.gratificacao_nps_pdf, r.gratificacao_nps_planilha), 0),
+        premio: rows.reduce((a, r) => a + valorConferido(r.premio_pdf, r.premio_planilha) + valorConferido(r.adiant_premio_pdf, r.adiant_premio_planilha), 0),
       benef: rows.reduce((a, r) => a + Number(r.vale_transporte ?? 0) + Number(r.vale_refeicao ?? 0) + Number(r.plano_saude ?? 0), 0),
       inss: rows.reduce((a, r) => a + Number(r.base_inss ?? 0), 0),
       fgts: rows.reduce((a, r) => a + Number(r.valor_fgts ?? 0), 0),
@@ -251,10 +372,10 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {filtrados.map(({ cur, prev }) => {
-                    const comAtual = Number(cur.comissao_pdf) + Number(cur.comissao_planilha);
-                    const comPrev = Number(prev?.comissao_pdf ?? 0) + Number(prev?.comissao_planilha ?? 0);
+                    const comAtual = valorConferido(cur.comissao_pdf, cur.comissao_planilha);
+                    const comPrev = valorConferido(prev?.comissao_pdf, prev?.comissao_planilha);
                     const dC = comAtual - comPrev;
-                    const grat = Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf) + Number(cur.gratificacao_planilha) + Number(cur.gratificacao_nps_planilha);
+                    const grat = valorConferido(cur.gratificacao_pdf, cur.gratificacao_planilha) + valorConferido(cur.gratificacao_nps_pdf, cur.gratificacao_nps_planilha);
                     return (
                       <tr key={cur.id} onClick={() => setColSel(cur.id)} className="border-t hover:bg-muted/40 cursor-pointer">
                         <td className="p-2 font-medium">{cur.nome}</td>
@@ -354,11 +475,11 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {filtrados.map(({ cur }) => {
-                    const com = Number(cur.comissao_planilha) + Number(cur.comissao_pdf);
-                    const g20 = Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf);
-                    const nps = Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf);
-                    const prm = Number(cur.premio_planilha) + Number(cur.premio_pdf);
-                    const adi = Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf);
+                    const com = valorConferido(cur.comissao_planilha, cur.comissao_pdf);
+                    const g20 = valorConferido(cur.gratificacao_planilha, cur.gratificacao_pdf);
+                    const nps = valorConferido(cur.gratificacao_nps_planilha, cur.gratificacao_nps_pdf);
+                    const prm = valorConferido(cur.premio_planilha, cur.premio_pdf);
+                    const adi = valorConferido(cur.adiant_premio_planilha, cur.adiant_premio_pdf);
                     const total = com + g20 + nps + prm + adi;
                     if (total === 0) return null;
                     return (
@@ -486,11 +607,11 @@ function ColaboradorDetalhe({ cur, prev, emprestimos }: { cur: ItemRow; prev: It
       </SheetHeader>
       <div className="mt-4 space-y-4">
         <Section title="Comissões e gratificações (a lançar)">
-          <Linha label="Comissão (37)" value={Number(cur.comissao_planilha) + Number(cur.comissao_pdf)} prev={Number(prev?.comissao_planilha ?? 0) + Number(prev?.comissao_pdf ?? 0)} />
-          <Linha label="Gratificação (20)" value={Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf)} prev={Number(prev?.gratificacao_planilha ?? 0) + Number(prev?.gratificacao_pdf ?? 0)} />
-          <Linha label="Gratificação NPS (286)" value={Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf)} prev={Number(prev?.gratificacao_nps_planilha ?? 0) + Number(prev?.gratificacao_nps_pdf ?? 0)} />
-          <Linha label="Prêmio (219)" value={Number(cur.premio_planilha) + Number(cur.premio_pdf)} prev={Number(prev?.premio_planilha ?? 0) + Number(prev?.premio_pdf ?? 0)} />
-          <Linha label="Adiant. Prêmio (241)" value={Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf)} prev={Number(prev?.adiant_premio_planilha ?? 0) + Number(prev?.adiant_premio_pdf ?? 0)} />
+          <Linha label="Comissão (37)" value={valorConferido(cur.comissao_planilha, cur.comissao_pdf)} prev={valorConferido(prev?.comissao_planilha, prev?.comissao_pdf)} />
+          <Linha label="Gratificação (20)" value={valorConferido(cur.gratificacao_planilha, cur.gratificacao_pdf)} prev={valorConferido(prev?.gratificacao_planilha, prev?.gratificacao_pdf)} />
+          <Linha label="Gratificação NPS (286)" value={valorConferido(cur.gratificacao_nps_planilha, cur.gratificacao_nps_pdf)} prev={valorConferido(prev?.gratificacao_nps_planilha, prev?.gratificacao_nps_pdf)} />
+          <Linha label="Prêmio (219)" value={valorConferido(cur.premio_planilha, cur.premio_pdf)} prev={valorConferido(prev?.premio_planilha, prev?.premio_pdf)} />
+          <Linha label="Adiant. Prêmio (241)" value={valorConferido(cur.adiant_premio_planilha, cur.adiant_premio_pdf)} prev={valorConferido(prev?.adiant_premio_planilha, prev?.adiant_premio_pdf)} />
         </Section>
 
         <Section title="Empréstimos consignados">
@@ -601,12 +722,12 @@ function competenciaAnterior(comp: string): string | null {
 
 function ALancarTab({ itens, competencia, empresa }: { itens: ItemRow[]; competencia: string; empresa: string }) {
   const linhas = itens
-    .map((i) => {
-      const com = Number(i.comissao_planilha) + Number(i.comissao_pdf);
-      const g20 = Number(i.gratificacao_planilha) + Number(i.gratificacao_pdf);
-      const nps = Number(i.gratificacao_nps_planilha) + Number(i.gratificacao_nps_pdf);
-      const prm = Number(i.premio_planilha) + Number(i.premio_pdf);
-      const adi = Number(i.adiant_premio_planilha) + Number(i.adiant_premio_pdf);
+      .map((i) => {
+        const com = valorConferido(i.comissao_planilha, i.comissao_pdf);
+        const g20 = valorConferido(i.gratificacao_planilha, i.gratificacao_pdf);
+        const nps = valorConferido(i.gratificacao_nps_planilha, i.gratificacao_nps_pdf);
+        const prm = valorConferido(i.premio_planilha, i.premio_pdf);
+        const adi = valorConferido(i.adiant_premio_planilha, i.adiant_premio_pdf);
       const total = com + g20 + nps + prm + adi;
       return { i, com, g20, nps, prm, adi, total };
     })
