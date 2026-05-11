@@ -237,6 +237,13 @@ export async function parseDominioPdf(buf: ArrayBuffer): Promise<PdfParseResult>
       aggregateLines.push(line);
       continue;
     }
+    // Encerra o bloco corrente quando começa a seção de totais/resumo do PDF —
+    // evita que linhas como "Resumo por Rubrica" sejam atribuídas ao último funcionário.
+    if (/Total Geral Proventos|Resumo por Rubrica|L[íi]quido Geral:/i.test(line)) {
+      flushCurrent();
+      current = null;
+      continue;
+    }
     if (!current) continue;
     aggregateLines.push(line);
 
