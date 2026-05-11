@@ -1,4 +1,4 @@
-import { approxEqual } from "./normalize";
+import { normalizeName } from "./normalize";
 import type { PdfFuncionario, PdfParseResult } from "./parsePdf";
 import type { PlanilhaParseResult, EsocialContrato } from "./parseXls";
 
@@ -67,6 +67,17 @@ export interface ConferenciaResult {
 
 const TOL = 0.05;
 
+function nomesCompativeis(a: string, b: string) {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (!na.startsWith(nb) && !nb.startsWith(na)) return false;
+  const ta = na.split(" ");
+  const tb = nb.split(" ");
+  return Math.min(ta.length, tb.length) >= 3 && ta.slice(0, 3).join(" ") === tb.slice(0, 3).join(" ");
+}
+
 export function conferir(
   pdf: PdfParseResult,
   planilhas: PlanilhaParseResult[],
@@ -95,7 +106,8 @@ export function conferir(
   for (const f of pdf.funcionarios) {
     const matchPlan =
       (f.matricula && planByMat.get(`mat:${f.matricula}`)) ||
-      planByName.get(`nome:${f.nome}`);
+      planByName.get(`nome:${f.nome}`) ||
+      [...planByName.values()].find(({ entry }) => nomesCompativeis(entry.nome, f.nome));
     const planEntry = matchPlan?.entry;
     if (matchPlan) {
       usedPlan.add(`mat:${matchPlan.entry.matricula}|${matchPlan.entry.nome}`);
