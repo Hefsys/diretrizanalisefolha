@@ -372,10 +372,10 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {filtrados.map(({ cur, prev }) => {
-                    const comAtual = Number(cur.comissao_pdf) + Number(cur.comissao_planilha);
-                    const comPrev = Number(prev?.comissao_pdf ?? 0) + Number(prev?.comissao_planilha ?? 0);
+                    const comAtual = valorConferido(cur.comissao_pdf, cur.comissao_planilha);
+                    const comPrev = valorConferido(prev?.comissao_pdf, prev?.comissao_planilha);
                     const dC = comAtual - comPrev;
-                    const grat = Number(cur.gratificacao_pdf) + Number(cur.gratificacao_nps_pdf) + Number(cur.gratificacao_planilha) + Number(cur.gratificacao_nps_planilha);
+                    const grat = valorConferido(cur.gratificacao_pdf, cur.gratificacao_planilha) + valorConferido(cur.gratificacao_nps_pdf, cur.gratificacao_nps_planilha);
                     return (
                       <tr key={cur.id} onClick={() => setColSel(cur.id)} className="border-t hover:bg-muted/40 cursor-pointer">
                         <td className="p-2 font-medium">{cur.nome}</td>
@@ -475,11 +475,11 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   {filtrados.map(({ cur }) => {
-                    const com = Number(cur.comissao_planilha) + Number(cur.comissao_pdf);
-                    const g20 = Number(cur.gratificacao_planilha) + Number(cur.gratificacao_pdf);
-                    const nps = Number(cur.gratificacao_nps_planilha) + Number(cur.gratificacao_nps_pdf);
-                    const prm = Number(cur.premio_planilha) + Number(cur.premio_pdf);
-                    const adi = Number(cur.adiant_premio_planilha) + Number(cur.adiant_premio_pdf);
+                    const com = valorConferido(cur.comissao_planilha, cur.comissao_pdf);
+                    const g20 = valorConferido(cur.gratificacao_planilha, cur.gratificacao_pdf);
+                    const nps = valorConferido(cur.gratificacao_nps_planilha, cur.gratificacao_nps_pdf);
+                    const prm = valorConferido(cur.premio_planilha, cur.premio_pdf);
+                    const adi = valorConferido(cur.adiant_premio_planilha, cur.adiant_premio_pdf);
                     const total = com + g20 + nps + prm + adi;
                     if (total === 0) return null;
                     return (
