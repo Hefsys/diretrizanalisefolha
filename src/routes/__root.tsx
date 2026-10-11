@@ -42,7 +42,10 @@ export const Route = createRootRoute({
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&display=swap" },
+    ],
     scripts: [
       {
         children: `(function(k,u){var v=localStorage.getItem("_hv")||Math.random().toString(36).slice(2);localStorage.setItem("_hv",v);var s=sessionStorage.getItem("_hs")||Math.random().toString(36).slice(2);sessionStorage.setItem("_hs",s);function t(){var d=JSON.stringify({k:k,p:location.pathname,r:document.referrer,v:v,s:s});navigator.sendBeacon?navigator.sendBeacon(u,new Blob([d],{type:"text/plain"})):fetch(u,{method:"POST",body:d,keepalive:true});}var o=history.pushState;history.pushState=function(){o.apply(this,arguments);t();};addEventListener("popstate",t);t();})("91ec389e302003104d6614fba26c1cbf","https://2759ecc8-6d14-4e25-8697-56ad976a5aa9.lovableproject.com/api/public/track");`,
